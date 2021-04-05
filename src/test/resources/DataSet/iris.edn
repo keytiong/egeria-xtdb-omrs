@@ -1,0 +1,12 @@
+{:openmetadata.Entity/guid "9bfbf0ca-3fb0-4980-a8b2-be903da4d1cf"
+ :openmetadata.Entity/typeDefName "DataSet"
+ :openmetadata.Entity/typeDefGUID "1449911c-4f44-4c22-abc0-7540154feefb"
+ :openmetadata.Referenceable/qualifiedName "http://archive.ics.uci.edu/ml/machine-learning-databases/iris/iris.data"
+ :openmetadata.Referenceable/additionalProperties {}
+ :openmetadata.Asset/name "Iris Plants Database"
+ :openmetadata.Asset/description "Multivariate data set introduced by Ronald Fisher in his 1936 paper The use of multiple measurements in taxonomic problems"
+ :openmetadata.Asset/owner nil
+ :openmetadata.Asset/ownerType nil
+ :openmetadata.Asset/zoneMembership []
+ :openmetadata.Asset/latestChange nil
+ :openmetadata.Entity/classifications []}

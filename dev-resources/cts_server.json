@@ -1,0 +1,351 @@
+{
+  "class": "OMAGServerConfigResponse",
+  "relatedHTTPCode": 200,
+  "omagserverConfig": {
+    "class": "OMAGServerConfig",
+    "versionId": "V2.0",
+    "localServerId": "d889fcc1-e646-47eb-97ea-d8b1c6f20962",
+    "localServerName": "CTS_Server",
+    "localServerType": "Conformance Suite Server",
+    "localServerURL": "https://localhost:",
+    "localServerUserId": "CTS1npa",
+    "localServerPassword": "CTS1passw0rd",
+    "maxPageSize": 50,
+    "eventBusConfig": {
+      "class": "EventBusConfig",
+      "topicURLRoot": "egeria.omag",
+      "configurationProperties": {
+        "producer": {
+          "bootstrap.servers": "localhost:32839"
+        },
+        "consumer": {
+          "bootstrap.servers": "localhost:32839"
+        }
+      },
+      "additionalProperties": {
+        "producer": {
+          "bootstrap.servers": "localhost:32839"
+        },
+        "consumer": {
+          "bootstrap.servers": "localhost:32839"
+        }
+      }
+    },
+    "repositoryServicesConfig": {
+      "class": "RepositoryServicesConfig",
+      "auditLogConnections": [
+        {
+          "class": "Connection",
+          "headerVersion": 0,
+          "displayName": "Console",
+          "connectorType": {
+            "class": "ConnectorType",
+            "headerVersion": 0,
+            "type": {
+              "class": "ElementType",
+              "headerVersion": 0,
+              "elementOrigin": "LOCAL_COHORT",
+              "elementVersion": 0,
+              "elementTypeId": "954421eb-33a6-462d-a8ca-b5709a1bd0d4",
+              "elementTypeName": "ConnectorType",
+              "elementTypeVersion": 1,
+              "elementTypeDescription": "A set of properties describing a type of connector."
+            },
+            "guid": "4afac741-3dcc-4c60-a4ca-a6dede994e3f",
+            "qualifiedName": "Console Audit Log Store Connector",
+            "displayName": "Console Audit Log Store Connector",
+            "description": "Connector supports logging of audit log messages to stdout.",
+            "connectorProviderClassName": "org.odpi.openmetadata.adapters.repositoryservices.auditlogstore.console.ConsoleAuditLogStoreProvider"
+          },
+          "configurationProperties": {
+            "supportedSeverities": [
+              "<Unknown>",
+              "Information",
+              "Event",
+              "Decision",
+              "Action",
+              "Error",
+              "Exception",
+              "Security",
+              "Startup",
+              "Shutdown",
+              "Asset",
+              "Types",
+              "Cohort"
+            ]
+          }
+        }
+      ],
+      "localRepositoryConfig": {
+        "class": "LocalRepositoryConfig",
+        "metadataCollectionId": "e377e6d4-3797-432d-8d53-184f3d5176b6",
+        "localRepositoryMode": "OPEN_METADATA_NATIVE",
+        "localRepositoryLocalConnection": {
+          "class": "Connection",
+          "headerVersion": 0,
+          "connectorType": {
+            "class": "ConnectorType",
+            "headerVersion": 0,
+            "type": {
+              "class": "ElementType",
+              "headerVersion": 0,
+              "elementOrigin": "LOCAL_COHORT",
+              "elementVersion": 0,
+              "elementTypeId": "954421eb-33a6-462d-a8ca-b5709a1bd0d4",
+              "elementTypeName": "ConnectorType",
+              "elementTypeVersion": 1,
+              "elementTypeDescription": "A set of properties describing a type of connector."
+            },
+            "guid": "65cc9091-757f-4bcd-b937-426160be8bc2",
+            "qualifiedName": "OMRS In Memory Repository Connector",
+            "displayName": "OMRS In Memory Repository Connector",
+            "description": "OMRS Repository Connector that uses an in-memory store.",
+            "connectorProviderClassName": "org.odpi.openmetadata.adapters.repositoryservices.inmemory.repositoryconnector.InMemoryOMRSRepositoryConnectorProvider"
+          }
+        },
+        "localRepositoryRemoteConnection": {
+          "class": "Connection",
+          "headerVersion": 0,
+          "connectorType": {
+            "class": "ConnectorType",
+            "headerVersion": 0,
+            "type": {
+              "class": "ElementType",
+              "headerVersion": 0,
+              "elementOrigin": "LOCAL_COHORT",
+              "elementVersion": 0,
+              "elementTypeId": "954421eb-33a6-462d-a8ca-b5709a1bd0d4",
+              "elementTypeName": "ConnectorType",
+              "elementTypeVersion": 1,
+              "elementTypeDescription": "A set of properties describing a type of connector."
+            },
+            "guid": "75ea56d1-656c-43fb-bc0c-9d35c5553b9e",
+            "qualifiedName": "OMRS REST API Repository Connector",
+            "displayName": "OMRS REST API Repository Connector",
+            "description": "OMRS Repository Connector that calls the repository services REST API of a remote server.",
+            "connectorProviderClassName": "org.odpi.openmetadata.adapters.repositoryservices.rest.repositoryconnector.OMRSRESTRepositoryConnectorProvider"
+          },
+          "endpoint": {
+            "class": "Endpoint",
+            "headerVersion": 0,
+            "address": "https://localhost:/servers/CTS_Server"
+          }
+        },
+        "eventsToSaveRule": "ALL",
+        "eventsToSendRule": "ALL"
+      },
+      "enterpriseAccessConfig": {
+        "class": "EnterpriseAccessConfig",
+        "enterpriseMetadataCollectionName": "CTS_Server Enterprise Metadata Collection",
+        "enterpriseMetadataCollectionId": "9b29ac9b-449e-4543-a3f7-b087a0c9d727",
+        "enterpriseOMRSTopicConnection": {
+          "class": "VirtualConnection",
+          "headerVersion": 0,
+          "connectorType": {
+            "class": "ConnectorType",
+            "headerVersion": 0,
+            "connectorProviderClassName": "org.odpi.openmetadata.repositoryservices.connectors.omrstopic.OMRSTopicProvider"
+          },
+          "embeddedConnections": [
+            {
+              "class": "EmbeddedConnection",
+              "headerVersion": 0,
+              "position": 0,
+              "displayName": "Enterprise OMRS Events",
+              "embeddedConnection": {
+                "class": "Connection",
+                "headerVersion": 0,
+                "connectorType": {
+                  "class": "ConnectorType",
+                  "headerVersion": 0,
+                  "type": {
+                    "class": "ElementType",
+                    "headerVersion": 0,
+                    "elementOrigin": "LOCAL_COHORT",
+                    "elementVersion": 0,
+                    "elementTypeId": "954421eb-33a6-462d-a8ca-b5709a1bd0d4",
+                    "elementTypeName": "ConnectorType",
+                    "elementTypeVersion": 1,
+                    "elementTypeDescription": "A set of properties describing a type of connector."
+                  },
+                  "guid": "ed8e682b-2fec-4403-b551-02f8c46322ef",
+                  "qualifiedName": "In Memory Open Metadata Topic Connector",
+                  "displayName": "In Memory Open Metadata Topic Connector",
+                  "description": "In Memory Open Metadata Topic Connector supports string based events over an in memory event bus.",
+                  "connectorProviderClassName": "org.odpi.openmetadata.adapters.eventbus.topic.inmemory.InMemoryOpenMetadataTopicProvider",
+                  "recognizedConfigurationProperties": [
+                    "sleepTime"
+                  ]
+                },
+                "endpoint": {
+                  "class": "Endpoint",
+                  "headerVersion": 0,
+                  "address": "CTS_Server.openmetadata.repositoryservices.enterprise.CTS_Server.OMRSTopic"
+                },
+                "configurationProperties": {
+                  "local.server.id": "d889fcc1-e646-47eb-97ea-d8b1c6f20962"
+                }
+              }
+            }
+          ]
+        },
+        "enterpriseOMRSTopicProtocolVersion": "V1"
+      },
+      "cohortConfigList": [
+        {
+          "class": "CohortConfig",
+          "cohortName": "devCohort",
+          "cohortRegistryConnection": {
+            "class": "Connection",
+            "headerVersion": 0,
+            "connectorType": {
+              "class": "ConnectorType",
+              "headerVersion": 0,
+              "type": {
+                "class": "ElementType",
+                "headerVersion": 0,
+                "elementOrigin": "LOCAL_COHORT",
+                "elementVersion": 0,
+                "elementTypeId": "954421eb-33a6-462d-a8ca-b5709a1bd0d4",
+                "elementTypeName": "ConnectorType",
+                "elementTypeVersion": 1,
+                "elementTypeDescription": "A set of properties describing a type of connector."
+              },
+              "guid": "108b85fe-d7a8-45c3-9f88-742ac4e4fd14",
+              "qualifiedName": "File Based Cohort Registry Store Connector",
+              "displayName": "File Based Cohort Registry Store Connector",
+              "description": "Connector supports storing of the open metadata cohort registry in a file.",
+              "connectorProviderClassName": "org.odpi.openmetadata.adapters.repositoryservices.cohortregistrystore.file.FileBasedRegistryStoreProvider"
+            },
+            "endpoint": {
+              "class": "Endpoint",
+              "headerVersion": 0,
+              "address": "./data/servers/CTS_Server/cohorts/devCohort.registrystore"
+            }
+          },
+          "cohortOMRSTopicConnection": {
+            "class": "VirtualConnection",
+            "headerVersion": 0,
+            "connectorType": {
+              "class": "ConnectorType",
+              "headerVersion": 0,
+              "connectorProviderClassName": "org.odpi.openmetadata.repositoryservices.connectors.omrstopic.OMRSTopicProvider"
+            },
+            "embeddedConnections": [
+              {
+                "class": "EmbeddedConnection",
+                "headerVersion": 0,
+                "position": 0,
+                "displayName": "devCohort OMRS Topic",
+                "embeddedConnection": {
+                  "class": "Connection",
+                  "headerVersion": 0,
+                  "connectorType": {
+                    "class": "ConnectorType",
+                    "headerVersion": 0,
+                    "type": {
+                      "class": "ElementType",
+                      "headerVersion": 0,
+                      "elementOrigin": "LOCAL_COHORT",
+                      "elementVersion": 0,
+                      "elementTypeId": "954421eb-33a6-462d-a8ca-b5709a1bd0d4",
+                      "elementTypeName": "ConnectorType",
+                      "elementTypeVersion": 1,
+                      "elementTypeDescription": "A set of properties describing a type of connector."
+                    },
+                    "guid": "3851e8d0-e343-400c-82cb-3918fed81da6",
+                    "qualifiedName": "Kafka Open Metadata Topic Connector",
+                    "displayName": "Kafka Open Metadata Topic Connector",
+                    "description": "Kafka Open Metadata Topic Connector supports string based events over an Apache Kafka event bus.",
+                    "connectorProviderClassName": "org.odpi.openmetadata.adapters.eventbus.topic.kafka.KafkaOpenMetadataTopicProvider",
+                    "recognizedConfigurationProperties": [
+                      "producer",
+                      "consumer",
+                      "local.server.id",
+                      "sleepTime"
+                    ]
+                  },
+                  "endpoint": {
+                    "class": "Endpoint",
+                    "headerVersion": 0,
+                    "address": "egeria.omag.openmetadata.repositoryservices.cohort.devCohort.OMRSTopic"
+                  },
+                  "configurationProperties": {
+                    "producer": {
+                      "bootstrap.servers": "localhost:32839"
+                    },
+                    "local.server.id": "d889fcc1-e646-47eb-97ea-d8b1c6f20962",
+                    "consumer": {
+                      "bootstrap.servers": "localhost:32839"
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          "cohortOMRSTopicProtocolVersion": "V1",
+          "eventsToProcessRule": "ALL"
+        }
+      ]
+    },
+    "conformanceSuiteConfig": {
+      "class": "ConformanceSuiteConfig",
+      "repositoryWorkbenchConfig": {
+        "class": "RepositoryConformanceWorkbenchConfig",
+        "maxSearchResults": 10
+      }
+    },
+    "auditTrail": [
+      "Sat Mar 20 00:41:15 SGT 2021 garygeeke updated configuration for local server's URL root to https://localhost:9443.",
+      "Sat Mar 20 00:41:15 SGT 2021 garygeeke updated configuration for local server type name to Conformance Suite Server.",
+      "Sat Mar 20 00:41:15 SGT 2021 garygeeke updated configuration for local server's userId to CTS1npa.",
+      "Sat Mar 20 00:41:15 SGT 2021 garygeeke updated configuration for local server's password to CTS1passw0rd.",
+      "Sat Mar 20 00:42:59 SGT 2021 garygeeke updated configuration for local server's URL root to https://localhost:9443.",
+      "Sat Mar 20 00:42:59 SGT 2021 garygeeke updated configuration for local server type name to Conformance Suite Server.",
+      "Sat Mar 20 00:42:59 SGT 2021 garygeeke updated configuration for local server's userId to CTS1npa.",
+      "Sat Mar 20 00:42:59 SGT 2021 garygeeke updated configuration for local server's password to CTS1passw0rd.",
+      "Sat Mar 20 16:03:52 SGT 2021 garygeeke updated configuration for local server's URL root to https://localhost:9443.",
+      "Sat Mar 20 16:03:52 SGT 2021 garygeeke updated configuration for local server type name to Conformance Suite Server.",
+      "Sat Mar 20 16:03:52 SGT 2021 garygeeke updated configuration for local server's userId to CTS1npa.",
+      "Sat Mar 20 16:03:52 SGT 2021 garygeeke updated configuration for local server's password to CTS1passw0rd.",
+      "Sat Mar 20 16:14:02 SGT 2021 garygeeke updated configuration for local server's URL root to https://localhost:9443.",
+      "Sat Mar 20 16:14:02 SGT 2021 garygeeke updated configuration for local server type name to Conformance Suite Server.",
+      "Sat Mar 20 16:14:02 SGT 2021 garygeeke updated configuration for local server's userId to CTS1npa.",
+      "Sat Mar 20 16:14:02 SGT 2021 garygeeke updated configuration for local server's password to CTS1passw0rd.",
+      "Sat Mar 20 16:14:02 SGT 2021 garygeeke updated configuration for default event bus.",
+      "Sat Mar 20 16:14:03 SGT 2021 garygeeke updated configuration for cohort devCohort.",
+      "Sat Mar 20 16:14:03 SGT 2021 garygeeke begins adding configuration for Conformance Suite Services.",
+      "Sat Mar 20 16:14:03 SGT 2021 garygeeke updated configuration for maximum page size to 50.",
+      "Sat Mar 20 16:14:03 SGT 2021 garygeeke updated configuration for local server type name to Conformance Suite Services.",
+      "Sat Mar 20 16:14:03 SGT 2021 garygeeke updated configuration for the local repository.",
+      "Sat Mar 20 16:14:03 SGT 2021 garygeeke enable repository workbench to test SUT_Server.",
+      "Sat Mar 20 16:14:03 SGT 2021 garygeeke finished adding configuration for Conformance Suite Services.",
+      "Sat Mar 20 20:55:48 SGT 2021 garygeeke updated configuration for local server's URL root to https://localhost:9443.",
+      "Sat Mar 20 20:55:48 SGT 2021 garygeeke updated configuration for local server type name to Conformance Suite Server.",
+      "Sat Mar 20 20:55:48 SGT 2021 garygeeke updated configuration for local server's userId to CTS1npa.",
+      "Sat Mar 20 20:55:48 SGT 2021 garygeeke updated configuration for local server's password to CTS1passw0rd.",
+      "Sat Mar 20 20:55:48 SGT 2021 garygeeke updated configuration for default event bus.",
+      "Sat Mar 20 20:55:48 SGT 2021 garygeeke updated configuration for cohort devCohort.",
+      "Sat Mar 20 20:55:48 SGT 2021 garygeeke begins adding configuration for Conformance Suite Services.",
+      "Sat Mar 20 20:55:48 SGT 2021 garygeeke enable repository workbench to test SUT_Server.",
+      "Sat Mar 20 20:55:48 SGT 2021 garygeeke finished adding configuration for Conformance Suite Services.",
+      "Sat Mar 20 23:56:48 SGT 2021 garygeeke updated configuration for local server's URL root to https://localhost:.",
+      "Sat Mar 20 23:56:49 SGT 2021 garygeeke updated configuration for local server type name to Conformance Suite Server.",
+      "Sat Mar 20 23:56:49 SGT 2021 garygeeke updated configuration for local server's userId to CTS1npa.",
+      "Sat Mar 20 23:56:49 SGT 2021 garygeeke updated configuration for local server's password to CTS1passw0rd.",
+      "Sat Mar 20 23:56:49 SGT 2021 garygeeke updated configuration for the local repository.",
+      "Sat Mar 20 23:56:49 SGT 2021 garygeeke preserving local metadata collection id e377e6d4-3797-432d-8d53-184f3d5176b6.",
+      "Sun Mar 21 00:01:22 SGT 2021 garygeeke updated configuration for local server's URL root to https://localhost:.",
+      "Sun Mar 21 00:01:22 SGT 2021 garygeeke updated configuration for local server type name to Conformance Suite Server.",
+      "Sun Mar 21 00:01:22 SGT 2021 garygeeke updated configuration for local server's userId to CTS1npa.",
+      "Sun Mar 21 00:01:22 SGT 2021 garygeeke updated configuration for local server's password to CTS1passw0rd.",
+      "Sun Mar 21 00:01:22 SGT 2021 garygeeke updated configuration for the local repository.",
+      "Sun Mar 21 00:01:22 SGT 2021 garygeeke preserving local metadata collection id e377e6d4-3797-432d-8d53-184f3d5176b6.",
+      "Sun Mar 21 00:01:22 SGT 2021 garygeeke updated configuration for default event bus.",
+      "Sun Mar 21 00:01:22 SGT 2021 garygeeke updated configuration for cohort devCohort.",
+      "Sun Mar 21 00:01:22 SGT 2021 garygeeke begins adding configuration for Conformance Suite Services.",
+      "Sun Mar 21 00:01:22 SGT 2021 garygeeke enable repository workbench to test null.",
+      "Sun Mar 21 00:01:22 SGT 2021 garygeeke finished adding configuration for Conformance Suite Services."
+    ]
+  }
+}
