@@ -13,7 +13,7 @@
     <dependency>
       <groupId>juxt</groupId>
       <artifactId>crux-rocksdb</artifactId>
-      <version>21.02-1.15.0-beta</version>
+      <version>21.02-1.16.0-beta</version>
       <scope>runtime</scope>
     </dependency>
   </dependencies>
