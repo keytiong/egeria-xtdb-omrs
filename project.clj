@@ -4,9 +4,9 @@
   :license {:name "The MIT License"
             :url  "http://opensource.org/licenses/MIT"}
   :dependencies [[org.clojure/clojure "1.10.1"]
-                 [org.odpi.egeria/open-metadata-types "2.7"]
-                 [org.odpi.egeria/repository-services-apis "2.7"]
-                 [org.odpi.egeria/repository-services-implementation "2.7" :exclusions
+                 [org.odpi.egeria/open-metadata-types "3.3"]
+                 [org.odpi.egeria/repository-services-apis "3.3"]
+                 [org.odpi.egeria/repository-services-implementation "3.3" :exclusions
                   [org.odpi.egeria/graph-repository-connector
                    org.odpi.egeria/inmemory-repository-connector]]
                  [juxt/crux-core "21.04-1.16.0-beta"]]
