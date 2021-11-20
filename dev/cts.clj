@@ -10,7 +10,7 @@
 (def config
   {::event-bus  {}
 
-   ::platform   {:version       "2.8-SNAPSHOT"
+   ::platform   {:version       "3.3"
                  :egeria-home   "/opt/egeria/egeria-omag"
                  :server-port   9443
                  :admin-user-id "garygeeke"}
