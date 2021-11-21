@@ -16,7 +16,7 @@ import org.odpi.openmetadata.repositoryservices.connectors.stores.metadatacollec
  * name of the OMRS Connector implementation (by calling super.setConnectorClassName(className)).
  * Then the connector provider will work.
  */
-public class CruxOMRSRepositoryConnectorProvider extends OMRSRepositoryConnectorProviderBase
+public class XtdbOMRSRepositoryConnectorProvider extends OMRSRepositoryConnectorProviderBase
 {
     static final String  connectorTypeGUID = "8c1e2220-a0c7-4344-9e60-f071c40a23ea";
     static final String  connectorTypeName = "OMRS Crux Repository Connector";
@@ -27,9 +27,9 @@ public class CruxOMRSRepositoryConnectorProvider extends OMRSRepositoryConnector
      * Constructor used to initialize the ConnectorProviderBase with the Java class name of the specific
      * OMRS Connector implementation.
      */
-    public CruxOMRSRepositoryConnectorProvider()
+    public XtdbOMRSRepositoryConnectorProvider()
     {
-        Class<?>    connectorClass = CruxOMRSRepositoryConnector.class;
+        Class<?>    connectorClass = XtdbOMRSRepositoryConnector.class;
 
         super.setConnectorClassName(connectorClass.getName());
 

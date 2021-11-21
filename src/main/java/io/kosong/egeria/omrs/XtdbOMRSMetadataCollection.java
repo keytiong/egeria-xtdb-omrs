@@ -1,6 +1,6 @@
 package io.kosong.egeria.omrs;
 
-import crux.api.ICruxAPI;
+import xtdb.api.IXtdb;
 import org.odpi.openmetadata.frameworks.auditlog.AuditLog;
 import org.odpi.openmetadata.frameworks.auditlog.messagesets.ExceptionMessageDefinition;
 import org.odpi.openmetadata.repositoryservices.connectors.stores.metadatacollectionstore.OMRSDynamicTypeMetadataCollectionBase;
@@ -47,10 +47,9 @@ import java.util.Map;
  * The CruxOMRSMetadataCollection provides a local open metadata repository that uses Juxt Crux as its
  * persistence layer.
  */
-public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectionBase
-{
+public class XtdbOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectionBase {
 
-    private static final Logger log = LoggerFactory.getLogger(CruxOMRSMetadataCollection.class);
+    private static final Logger log = LoggerFactory.getLogger(XtdbOMRSMetadataCollection.class);
 
     private GraphOMRSMetadataStore graphStore = null;
 
@@ -65,14 +64,13 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
      * @param metadataCollectionId - unique Identifier of the metadata collection Id.
      * @param auditLog             - logging destination
      */
-    CruxOMRSMetadataCollection(CruxOMRSRepositoryConnector  parentConnector,
-                                String                      repositoryName,
-                                OMRSRepositoryHelper        repositoryHelper,
-                                OMRSRepositoryValidator     repositoryValidator,
-                                String                      metadataCollectionId,
-                                AuditLog                    auditLog,
-                               ICruxAPI cruxNode) throws RepositoryErrorException
-    {
+    XtdbOMRSMetadataCollection(XtdbOMRSRepositoryConnector parentConnector,
+                               String repositoryName,
+                               OMRSRepositoryHelper repositoryHelper,
+                               OMRSRepositoryValidator repositoryValidator,
+                               String metadataCollectionId,
+                               AuditLog auditLog,
+                               IXtdb xtdbNode) throws RepositoryErrorException {
         /*
          * The metadata collection Id is the unique Id for the metadata collection.  It is managed by the super class.
          */
@@ -87,10 +85,9 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
 
         try {
             Class<?> clazz = Class.forName("io.kosong.egeria.omrs.CruxOMRSMetadataStore");
-            Constructor ctor = clazz.getDeclaredConstructor(String.class, String.class, OMRSRepositoryHelper.class, ICruxAPI.class);
-            this.graphStore = (GraphOMRSMetadataStore) ctor.newInstance(repositoryName, metadataCollectionId, repositoryHelper, cruxNode);
-        }
-        catch(Throwable t) {
+            Constructor ctor = clazz.getDeclaredConstructor(String.class, String.class, OMRSRepositoryHelper.class, IXtdb.class);
+            this.graphStore = (GraphOMRSMetadataStore) ctor.newInstance(repositoryName, metadataCollectionId, repositoryHelper, xtdbNode);
+        } catch (Throwable t) {
             /*
              * Log the error here, but also rethrow the exception to the caller so that the connector sees it and can throw an
              * OMRSLogicErrorException.
@@ -107,15 +104,14 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
 
     // verifyTypeDef will always return result from superclass because all knowledge of types is delegated to the RCM.
     @Override
-    public boolean verifyTypeDef(String  userId,
+    public boolean verifyTypeDef(String userId,
                                  TypeDef typeDef)
             throws
             InvalidParameterException,
             RepositoryErrorException,
             TypeDefConflictException,
             InvalidTypeDefException,
-            UserNotAuthorizedException
-    {
+            UserNotAuthorizedException {
         /*
          * Validate parameters
          */
@@ -142,11 +138,11 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
 
 
     @Override
-    public EntityDetail addEntity(String                userId,
-                                  String                entityTypeGUID,
-                                  InstanceProperties    initialProperties,
-                                  List<Classification>  initialClassifications,
-                                  InstanceStatus        initialStatus)
+    public EntityDetail addEntity(String userId,
+                                  String entityTypeGUID,
+                                  InstanceProperties initialProperties,
+                                  List<Classification> initialClassifications,
+                                  InstanceStatus initialStatus)
             throws
             InvalidParameterException,
             RepositoryErrorException,
@@ -154,8 +150,7 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
             PropertyErrorException,
             ClassificationErrorException,
             StatusNotSupportedException,
-            UserNotAuthorizedException
-    {
+            UserNotAuthorizedException {
 
         final String methodName = "addEntity";
 
@@ -200,21 +195,20 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
 
     // addExternalEntity
     @Override
-    public EntityDetail addExternalEntity(String                userId,
-                                          String                entityTypeGUID,
-                                          String                externalSourceGUID,
-                                          String                externalSourceName,
-                                          InstanceProperties    initialProperties,
-                                          List<Classification>  initialClassifications,
-                                          InstanceStatus        initialStatus) throws InvalidParameterException,
+    public EntityDetail addExternalEntity(String userId,
+                                          String entityTypeGUID,
+                                          String externalSourceGUID,
+                                          String externalSourceName,
+                                          InstanceProperties initialProperties,
+                                          List<Classification> initialClassifications,
+                                          InstanceStatus initialStatus) throws InvalidParameterException,
             RepositoryErrorException,
             TypeErrorException,
             PropertyErrorException,
             ClassificationErrorException,
             StatusNotSupportedException,
-            UserNotAuthorizedException
-    {
-        final String  methodName = "addExternalEntity";
+            UserNotAuthorizedException {
+        final String methodName = "addExternalEntity";
 
         TypeDef typeDef = super.addExternalEntityParameterValidation(userId,
                 entityTypeGUID,
@@ -258,13 +252,12 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
 
     // addEntityProxy
     @Override
-    public void addEntityProxy(String       userId,
-                               EntityProxy  entityProxy)
+    public void addEntityProxy(String userId,
+                               EntityProxy entityProxy)
             throws
             InvalidParameterException,
             RepositoryErrorException,
-            UserNotAuthorizedException
-    {
+            UserNotAuthorizedException {
         /*
          * Validate parameters
          */
@@ -273,25 +266,22 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
         /*
          * Validation complete
          */
-        EntityDetail  entity  = this.isEntityKnown(userId, entityProxy.getGUID());
-        if (entity == null)
-        {
+        EntityDetail entity = this.isEntityKnown(userId, entityProxy.getGUID());
+        if (entity == null) {
             graphStore.createEntityProxyInStore(entityProxy);
         }
     }
 
 
-
     // isEntityKnown
     @Override
-    public EntityDetail isEntityKnown(String     userId,
-                                      String     guid)
+    public EntityDetail isEntityKnown(String userId,
+                                      String guid)
             throws
             InvalidParameterException,
             RepositoryErrorException,
-            UserNotAuthorizedException
-    {
-        final String  methodName = "isEntityKnown";
+            UserNotAuthorizedException {
+        final String methodName = "isEntityKnown";
 
         /*
          * Validate parameters
@@ -306,8 +296,7 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
         try {
             entity = graphStore.getEntityDetailFromStore(guid);
             repositoryValidator.validateEntityFromStore(repositoryName, guid, entity, methodName);
-        }
-        catch (EntityProxyOnlyException | EntityNotKnownException e) {
+        } catch (EntityProxyOnlyException | EntityNotKnownException e) {
             log.error("{} entity with GUID {} does not exist in repository {} or is a proxy", methodName, guid, repositoryName);
             entity = null;
         }
@@ -317,14 +306,13 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
 
     // isRelationshipKnown
     @Override
-    public Relationship  isRelationshipKnown(String     userId,
-                                             String     guid)
+    public Relationship isRelationshipKnown(String userId,
+                                            String guid)
             throws
             InvalidParameterException,
             RepositoryErrorException,
-            UserNotAuthorizedException
-    {
-        final String  methodName = "isRelationshipKnown";
+            UserNotAuthorizedException {
+        final String methodName = "isRelationshipKnown";
 
         /*
          * Validate parameters
@@ -338,8 +326,7 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
         try {
             relationship = graphStore.getRelationshipFromStore(guid);
             repositoryValidator.validateRelationshipFromStore(repositoryName, guid, relationship, methodName);
-        }
-        catch (RelationshipNotKnownException e) {
+        } catch (RelationshipNotKnownException e) {
             log.warn("{} relationship with GUID {} does not exist in repository {}", methodName, guid, repositoryName);
             relationship = null;
         }
@@ -349,15 +336,14 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
 
     // getEntitySummary
     @Override
-    public EntitySummary getEntitySummary(String     userId,
-                                          String     guid)
+    public EntitySummary getEntitySummary(String userId,
+                                          String guid)
             throws
             InvalidParameterException,
             RepositoryErrorException,
             EntityNotKnownException,
-            UserNotAuthorizedException
-    {
-        final String  methodName        = "getEntitySummary";
+            UserNotAuthorizedException {
+        final String methodName = "getEntitySummary";
 
         /*
          * Validate parameters
@@ -378,15 +364,14 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
 
     // getEntityDetail
     @Override
-    public EntityDetail getEntityDetail(String     userId,
-                                        String     guid)
+    public EntityDetail getEntityDetail(String userId,
+                                        String guid)
             throws
             InvalidParameterException,
             RepositoryErrorException,
             EntityNotKnownException,
             EntityProxyOnlyException,
-            UserNotAuthorizedException
-    {
+            UserNotAuthorizedException {
         final String methodName = "getEntityDetail";
         final String guidParameterName = "guid";
 
@@ -410,12 +395,12 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
 
     // addRelationship
     @Override
-    public Relationship addRelationship(String               userId,
-                                        String               relationshipTypeGUID,
-                                        InstanceProperties   initialProperties,
-                                        String               entityOneGUID,
-                                        String               entityTwoGUID,
-                                        InstanceStatus       initialStatus)
+    public Relationship addRelationship(String userId,
+                                        String relationshipTypeGUID,
+                                        InstanceProperties initialProperties,
+                                        String entityOneGUID,
+                                        String entityTwoGUID,
+                                        InstanceStatus initialStatus)
             throws
             InvalidParameterException,
             RepositoryErrorException,
@@ -423,9 +408,8 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
             PropertyErrorException,
             EntityNotKnownException,
             StatusNotSupportedException,
-            UserNotAuthorizedException
-    {
-        final String  methodName = "addRelationship";
+            UserNotAuthorizedException {
+        final String methodName = "addRelationship";
 
         /*
          * Validate parameters
@@ -474,8 +458,7 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
         /*
          * If an initial status is supplied then override the default value.
          */
-        if (initialStatus != null)
-        {
+        if (initialStatus != null) {
             relationship.setStatus(initialStatus);
         }
 
@@ -487,21 +470,20 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
 
     // addExternalRelationship
     @Override
-    public Relationship addExternalRelationship(String               userId,
-                                                String               relationshipTypeGUID,
-                                                String               externalSourceGUID,
-                                                String               externalSourceName,
-                                                InstanceProperties   initialProperties,
-                                                String               entityOneGUID,
-                                                String               entityTwoGUID,
-                                                InstanceStatus       initialStatus) throws InvalidParameterException,
+    public Relationship addExternalRelationship(String userId,
+                                                String relationshipTypeGUID,
+                                                String externalSourceGUID,
+                                                String externalSourceName,
+                                                InstanceProperties initialProperties,
+                                                String entityOneGUID,
+                                                String entityTwoGUID,
+                                                InstanceStatus initialStatus) throws InvalidParameterException,
             RepositoryErrorException,
             TypeErrorException,
             PropertyErrorException,
             EntityNotKnownException,
             StatusNotSupportedException,
-            UserNotAuthorizedException
-    {
+            UserNotAuthorizedException {
         final String methodName = "addExternalRelationship";
 
         /*
@@ -555,8 +537,7 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
         /*
          * If an initial status is supplied then override the default value.
          */
-        if (initialStatus != null)
-        {
+        if (initialStatus != null) {
             relationship.setStatus(initialStatus);
         }
 
@@ -568,15 +549,14 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
 
     // getRelationship
     @Override
-    public Relationship getRelationship(String    userId,
-                                        String    guid)
+    public Relationship getRelationship(String userId,
+                                        String guid)
             throws
             InvalidParameterException,
             RepositoryErrorException,
             RelationshipNotKnownException,
-            UserNotAuthorizedException
-    {
-        final String  methodName = "getRelationship";
+            UserNotAuthorizedException {
+        final String methodName = "getRelationship";
 
         /*
          * Validate parameters
@@ -586,7 +566,7 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
         /*
          * Process operation
          */
-        Relationship  relationship = graphStore.getRelationshipFromStore(guid);
+        Relationship relationship = graphStore.getRelationshipFromStore(guid);
 
         repositoryValidator.validateRelationshipFromStore(repositoryName, guid, relationship, methodName);
         repositoryValidator.validateRelationshipIsNotDeleted(repositoryName, relationship, methodName);
@@ -597,18 +577,17 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
 
     // updateEntityStatus
     @Override
-    public EntityDetail updateEntityStatus(String           userId,
-                                           String           entityGUID,
-                                           InstanceStatus   newStatus)
+    public EntityDetail updateEntityStatus(String userId,
+                                           String entityGUID,
+                                           InstanceStatus newStatus)
             throws
             InvalidParameterException,
             RepositoryErrorException,
             EntityNotKnownException,
             StatusNotSupportedException,
-            UserNotAuthorizedException
-    {
-        final String  methodName               = "updateEntityStatus";
-        final String  statusParameterName      = "newStatus";
+            UserNotAuthorizedException {
+        final String methodName = "updateEntityStatus";
+        final String statusParameterName = "newStatus";
 
         /*
          * Validate parameters
@@ -623,8 +602,7 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
 
             entity = graphStore.getEntityDetailFromStore(entityGUID);
 
-        }
-        catch (EntityProxyOnlyException e) {
+        } catch (EntityProxyOnlyException e) {
             log.warn("{} entity wth GUID {} only a proxy", methodName, entityGUID);
 
             throw new EntityNotKnownException(OMRSErrorCode.ENTITY_PROXY_ONLY.getMessageDefinition(methodName,
@@ -634,8 +612,7 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
                     methodName,
                     e);
 
-        }
-        catch (EntityNotKnownException e) {
+        } catch (EntityNotKnownException e) {
             log.error("{} entity wth GUID {} not found ", methodName, entityGUID);
 
             throw new EntityNotKnownException(OMRSErrorCode.ENTITY_NOT_KNOWN.getMessageDefinition(entityGUID, methodName, repositoryName),
@@ -643,8 +620,7 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
                     methodName,
                     e);
 
-        }
-        catch (RepositoryErrorException e) {
+        } catch (RepositoryErrorException e) {
             log.error("{} repository exception during retrieval of entity wth GUID {}", methodName, entityGUID);
             throw e;
         }
@@ -663,8 +639,7 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
         TypeDef typeDef;
         try {
             typeDef = repositoryHelper.getTypeDef(repositoryName, "entityTypeGUID", entityTypeGUID, methodName);
-        }
-        catch (TypeErrorException e) {
+        } catch (TypeErrorException e) {
 
             throw new RepositoryErrorException(OMRSErrorCode.TYPEDEF_NOT_KNOWN.getMessageDefinition(entityTypeName,
                     entityTypeGUID,
@@ -682,7 +657,7 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
         /*
          * Validation complete - ok to make changes
          */
-        EntityDetail   updatedEntity = new EntityDetail(entity);
+        EntityDetail updatedEntity = new EntityDetail(entity);
 
         updatedEntity.setStatus(newStatus);
 
@@ -696,18 +671,17 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
 
     // updateEntityProperties
     @Override
-    public EntityDetail updateEntityProperties(String               userId,
-                                               String               entityGUID,
-                                               InstanceProperties   properties)
+    public EntityDetail updateEntityProperties(String userId,
+                                               String entityGUID,
+                                               InstanceProperties properties)
             throws
             InvalidParameterException,
             RepositoryErrorException,
             EntityNotKnownException,
             PropertyErrorException,
-            UserNotAuthorizedException
-    {
-        final String  methodName = "updateEntityProperties";
-        final String  propertiesParameterName  = "properties";
+            UserNotAuthorizedException {
+        final String methodName = "updateEntityProperties";
+        final String propertiesParameterName = "properties";
 
         /*
          * Validate parameters
@@ -722,8 +696,7 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
 
             entity = graphStore.getEntityDetailFromStore(entityGUID);
 
-        }
-        catch (EntityProxyOnlyException | EntityNotKnownException e) {
+        } catch (EntityProxyOnlyException | EntityNotKnownException e) {
             log.warn("{} entity wth GUID {} not found or only a proxy", methodName, entityGUID);
 
             throw new EntityNotKnownException(OMRSErrorCode.ENTITY_PROXY_ONLY.getMessageDefinition(methodName,
@@ -733,8 +706,7 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
                     methodName,
                     e);
 
-        }
-        catch (RepositoryErrorException e) {
+        } catch (RepositoryErrorException e) {
             log.error("{} repository exception during retrieval of entity wth GUID {}", methodName, entityGUID);
             throw e;
         }
@@ -751,8 +723,7 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
         TypeDef typeDef;
         try {
             typeDef = repositoryHelper.getTypeDef(repositoryName, "entityTypeGUID", entityTypeGUID, methodName);
-        }
-        catch (TypeErrorException e) {
+        } catch (TypeErrorException e) {
 
             throw new RepositoryErrorException(OMRSErrorCode.TYPEDEF_NOT_KNOWN.getMessageDefinition(entityTypeName,
                     entityTypeGUID,
@@ -773,7 +744,7 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
         /*
          * Validation complete - ok to make changes
          */
-        EntityDetail   updatedEntity = new EntityDetail(entity);
+        EntityDetail updatedEntity = new EntityDetail(entity);
 
         updatedEntity.setProperties(properties);
 
@@ -794,18 +765,17 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
 
     // updateRelationshipStatus
     @Override
-    public Relationship updateRelationshipStatus(String           userId,
-                                                 String           relationshipGUID,
-                                                 InstanceStatus   newStatus)
+    public Relationship updateRelationshipStatus(String userId,
+                                                 String relationshipGUID,
+                                                 InstanceStatus newStatus)
             throws
             InvalidParameterException,
             RepositoryErrorException,
             RelationshipNotKnownException,
             StatusNotSupportedException,
-            UserNotAuthorizedException
-    {
-        final String  methodName          = "updateRelationshipStatus";
-        final String  statusParameterName = "newStatus";
+            UserNotAuthorizedException {
+        final String methodName = "updateRelationshipStatus";
+        final String statusParameterName = "newStatus";
 
         /*
          * Validate parameters
@@ -815,7 +785,7 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
         /*
          * Locate relationship
          */
-        Relationship  relationship = this.getRelationship(userId, relationshipGUID);
+        Relationship relationship = this.getRelationship(userId, relationshipGUID);
 
         repositoryValidator.validateRelationshipCanBeUpdated(repositoryName, metadataCollectionId, relationship, methodName);
 
@@ -827,8 +797,7 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
         TypeDef typeDef;
         try {
             typeDef = repositoryHelper.getTypeDef(repositoryName, "relationshipTypeGUID", relationshipTypeGUID, methodName);
-        }
-        catch (TypeErrorException e) {
+        } catch (TypeErrorException e) {
 
             throw new RepositoryErrorException(OMRSErrorCode.TYPEDEF_NOT_KNOWN.getMessageDefinition(relationshipTypeName,
                     relationshipTypeGUID,
@@ -850,7 +819,7 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
         /*
          * Validation complete - ok to make changes
          */
-        Relationship   updatedRelationship = new Relationship(relationship);
+        Relationship updatedRelationship = new Relationship(relationship);
 
         updatedRelationship.setStatus(newStatus);
 
@@ -865,31 +834,30 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
     /**
      * Update the properties of a specific relationship.
      *
-     * @param userId unique identifier for requesting user.
+     * @param userId           unique identifier for requesting user.
      * @param relationshipGUID String unique identifier (guid) for the relationship.
-     * @param properties list of the properties to update.
+     * @param properties       list of the properties to update.
      * @return Resulting relationship structure with the new properties set.
-     * @throws InvalidParameterException one of the parameters is invalid or null.
-     * @throws RepositoryErrorException there is a problem communicating with the metadata repository where
-     *                                  the metadata collection is stored.
+     * @throws InvalidParameterException     one of the parameters is invalid or null.
+     * @throws RepositoryErrorException      there is a problem communicating with the metadata repository where
+     *                                       the metadata collection is stored.
      * @throws RelationshipNotKnownException the requested relationship is not known in the metadata collection.
-     * @throws PropertyErrorException one or more of the requested properties are not defined, or have different
-     *                                characteristics in the TypeDef for this relationship's type.
-     * @throws UserNotAuthorizedException the userId is not permitted to perform this operation.
+     * @throws PropertyErrorException        one or more of the requested properties are not defined, or have different
+     *                                       characteristics in the TypeDef for this relationship's type.
+     * @throws UserNotAuthorizedException    the userId is not permitted to perform this operation.
      */
     @Override
-    public Relationship updateRelationshipProperties(String               userId,
-                                                     String               relationshipGUID,
-                                                     InstanceProperties   properties)
+    public Relationship updateRelationshipProperties(String userId,
+                                                     String relationshipGUID,
+                                                     InstanceProperties properties)
             throws
             InvalidParameterException,
             RepositoryErrorException,
             RelationshipNotKnownException,
             PropertyErrorException,
-            UserNotAuthorizedException
-    {
-        final String  methodName = "updateRelationshipProperties";
-        final String  propertiesParameterName = "properties";
+            UserNotAuthorizedException {
+        final String methodName = "updateRelationshipProperties";
+        final String propertiesParameterName = "properties";
 
         /*
          * Validate parameters
@@ -899,7 +867,7 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
         /*
          * Locate relationship
          */
-        Relationship  relationship = this.getRelationship(userId, relationshipGUID);
+        Relationship relationship = this.getRelationship(userId, relationshipGUID);
 
         repositoryValidator.validateRelationshipCanBeUpdated(repositoryName, metadataCollectionId, relationship, methodName);
 
@@ -911,8 +879,7 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
         TypeDef typeDef;
         try {
             typeDef = repositoryHelper.getTypeDef(repositoryName, "relationshipTypeGUID", relationshipTypeGUID, methodName);
-        }
-        catch (TypeErrorException e) {
+        } catch (TypeErrorException e) {
 
             throw new RepositoryErrorException(OMRSErrorCode.TYPEDEF_NOT_KNOWN.getMessageDefinition(relationshipTypeName,
                     relationshipTypeGUID,
@@ -934,7 +901,7 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
         /*
          * Validation complete - ok to make changes
          */
-        Relationship   updatedRelationship = new Relationship(relationship);
+        Relationship updatedRelationship = new Relationship(relationship);
 
         updatedRelationship.setProperties(properties);
         updatedRelationship = repositoryHelper.incrementVersion(userId, relationship, updatedRelationship);
@@ -947,19 +914,18 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
 
     // purgeEntity
     @Override
-    public void purgeEntity(String    userId,
-                            String    typeDefGUID,
-                            String    typeDefName,
-                            String    deletedEntityGUID)
+    public void purgeEntity(String userId,
+                            String typeDefGUID,
+                            String typeDefName,
+                            String deletedEntityGUID)
             throws
             InvalidParameterException,
             RepositoryErrorException,
             EntityNotKnownException,
             EntityNotDeletedException,
-            UserNotAuthorizedException
-    {
-        final String  methodName  = "purgeEntity";
-        final String  parameterName  = "deletedEntityGUID";
+            UserNotAuthorizedException {
+        final String methodName = "purgeEntity";
+        final String parameterName = "deletedEntityGUID";
 
         /*
          * Validate parameters
@@ -974,8 +940,7 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
 
             entity = graphStore.getEntityDetailFromStore(deletedEntityGUID);
 
-        }
-        catch (EntityProxyOnlyException | EntityNotKnownException e) {
+        } catch (EntityProxyOnlyException | EntityNotKnownException e) {
             log.error("{} entity wth GUID {} not found or only a proxy", methodName, deletedEntityGUID);
 
             throw new EntityNotKnownException(OMRSErrorCode.ENTITY_PROXY_ONLY.getMessageDefinition(methodName,
@@ -985,8 +950,7 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
                     methodName,
                     e);
 
-        }
-        catch (RepositoryErrorException e) {
+        } catch (RepositoryErrorException e) {
             log.error("{} repository exception during retrieval of entity wth GUID {}", methodName, deletedEntityGUID);
             throw e;
         }
@@ -1005,8 +969,7 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
         /*
          * Locate/purge relationships for entity
          */
-        try
-        {
+        try {
             List<Relationship> relationships = this.getRelationshipsForEntity(userId,
                     deletedEntityGUID,
                     null,
@@ -1018,19 +981,14 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
                     10000);
 
 
-            if (relationships != null)
-            {
-                for (Relationship relationship : relationships)
-                {
-                    if (relationship != null)
-                    {
+            if (relationships != null) {
+                for (Relationship relationship : relationships) {
+                    if (relationship != null) {
                         graphStore.removeRelationshipFromStore(relationship.getGUID());
                     }
                 }
             }
-        }
-        catch (Throwable  error)
-        {
+        } catch (Throwable error) {
             // nothing to do - keep going
         }
 
@@ -1043,19 +1001,18 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
 
     // purgeRelationship
     @Override
-    public void purgeRelationship(String    userId,
-                                  String    typeDefGUID,
-                                  String    typeDefName,
-                                  String    deletedRelationshipGUID)
+    public void purgeRelationship(String userId,
+                                  String typeDefGUID,
+                                  String typeDefName,
+                                  String deletedRelationshipGUID)
             throws
             InvalidParameterException,
             RepositoryErrorException,
             RelationshipNotKnownException,
             RelationshipNotDeletedException,
-            UserNotAuthorizedException
-    {
-        final String  methodName = "purgeRelationship";
-        final String  parameterName  = "deletedRelationshipGUID";
+            UserNotAuthorizedException {
+        final String methodName = "purgeRelationship";
+        final String parameterName = "deletedRelationshipGUID";
 
 
         /*
@@ -1066,7 +1023,7 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
         /*
          * Locate relationship
          */
-        Relationship  relationship  = graphStore.getRelationshipFromStore(deletedRelationshipGUID);
+        Relationship relationship = graphStore.getRelationshipFromStore(deletedRelationshipGUID);
 
         repositoryValidator.validateRelationshipFromStore(repositoryName, deletedRelationshipGUID, relationship, methodName);
         repositoryValidator.validateTypeForInstanceDelete(repositoryName,
@@ -1088,15 +1045,15 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
 
     // getRelationshipsForEntity
     @Override
-    public List<Relationship> getRelationshipsForEntity(String                     userId,
-                                                        String                     entityGUID,
-                                                        String                     relationshipTypeGUID,
-                                                        int                        fromRelationshipElement,
-                                                        List<InstanceStatus>       limitResultsByStatus,
-                                                        Date                       asOfTime,
-                                                        String                     sequencingProperty,
-                                                        SequencingOrder            sequencingOrder,
-                                                        int                        pageSize)
+    public List<Relationship> getRelationshipsForEntity(String userId,
+                                                        String entityGUID,
+                                                        String relationshipTypeGUID,
+                                                        int fromRelationshipElement,
+                                                        List<InstanceStatus> limitResultsByStatus,
+                                                        Date asOfTime,
+                                                        String sequencingProperty,
+                                                        SequencingOrder sequencingOrder,
+                                                        int pageSize)
             throws
             InvalidParameterException,
             TypeErrorException,
@@ -1105,9 +1062,8 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
             PropertyErrorException,
             PagingErrorException,
             UserNotAuthorizedException,
-            FunctionNotSupportedException
-    {
-        final String  methodName = "getRelationshipsForEntity";
+            FunctionNotSupportedException {
+        final String methodName = "getRelationshipsForEntity";
 
         /*
          * Validate parameters
@@ -1125,7 +1081,7 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
         /*
          * Perform operation
          */
-        EntitySummary  entity = this.getEntitySummary(userId, entityGUID);
+        EntitySummary entity = this.getEntitySummary(userId, entityGUID);
 
         repositoryValidator.validateEntityFromStore(repositoryName, entityGUID, entity, methodName);
         repositoryValidator.validateEntityIsNotDeleted(repositoryName, entity, methodName);
@@ -1141,7 +1097,7 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
         List<Relationship> filteredRelationships = new ArrayList<>();
         List<Relationship> relationships = graphStore.getRelationshipsForEntity(entityGUID);
 
-        for (Relationship  relationship : relationships) {
+        for (Relationship relationship : relationships) {
 
             if (relationship != null) {
 
@@ -1149,13 +1105,13 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
                     // exclude DELETED relationships
 
                     // filter results according to status filter parameter
-                    if (  limitResultsByStatus == null
-                            || (   limitResultsByStatus != null
+                    if (limitResultsByStatus == null
+                            || (limitResultsByStatus != null
                             && !limitResultsByStatus.isEmpty()
                             && limitResultsByStatus.contains(relationship.getStatus()))) {
 
                         // filter by typeGUID if necessary
-                        if (relationshipTypeGUID == null  || relationshipTypeGUID.equals(relationship.getType().getTypeDefGUID())) {
+                        if (relationshipTypeGUID == null || relationshipTypeGUID.equals(relationship.getType().getTypeDefGUID())) {
                             filteredRelationships.add(relationship);
                         }
                     }
@@ -1163,8 +1119,7 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
             }
         }
 
-        if (filteredRelationships.isEmpty())
-        {
+        if (filteredRelationships.isEmpty()) {
             return null;
         }
 
@@ -1178,17 +1133,17 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
 
     // findEntitiesByProperty
     @Override
-    public  List<EntityDetail> findEntitiesByProperty(String                 userId,
-                                                      String                 entityTypeGUID,
-                                                      InstanceProperties     matchProperties,
-                                                      MatchCriteria          matchCriteria,
-                                                      int                    fromEntityElement,
-                                                      List<InstanceStatus>   limitResultsByStatus,
-                                                      List<String>           limitResultsByClassification,
-                                                      Date                   asOfTime,
-                                                      String                 sequencingProperty,
-                                                      SequencingOrder        sequencingOrder,
-                                                      int                    pageSize)
+    public List<EntityDetail> findEntitiesByProperty(String userId,
+                                                     String entityTypeGUID,
+                                                     InstanceProperties matchProperties,
+                                                     MatchCriteria matchCriteria,
+                                                     int fromEntityElement,
+                                                     List<InstanceStatus> limitResultsByStatus,
+                                                     List<String> limitResultsByClassification,
+                                                     Date asOfTime,
+                                                     String sequencingProperty,
+                                                     SequencingOrder sequencingOrder,
+                                                     int pageSize)
             throws
             InvalidParameterException,
             TypeErrorException,
@@ -1196,8 +1151,7 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
             PropertyErrorException,
             PagingErrorException,
             FunctionNotSupportedException,
-            UserNotAuthorizedException
-    {
+            UserNotAuthorizedException {
 
         final String methodName = "findEntitiesByProperty";
         final String entityTypeGUIDParameterName = "entityTypeGUID";
@@ -1228,7 +1182,7 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
         }
 
         // Generate a query plan
-        GraphOMRSQueryPlan queryPlan = new   GraphOMRSQueryPlan(repositoryName,
+        GraphOMRSQueryPlan queryPlan = new GraphOMRSQueryPlan(repositoryName,
                 metadataCollectionId,
                 repositoryHelper,
                 TypeDefCategory.ENTITY_DEF,
@@ -1246,8 +1200,7 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
 
         String filterTypeName = queryPlan.getFilterTypeName();
 
-        if (validTypeNames.isEmpty())
-        {
+        if (validTypeNames.isEmpty()) {
             /*
              * Whether filtering was requested or not, short-circuit if there are no valid types as there can be no valid results.
              */
@@ -1258,15 +1211,12 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
         List<EntityDetail> foundEntities = null;
 
         // If there were any dups there must be horizontal duplication (across the types within the valid type set).
-        if (queryPlan.getQueryStrategy() == GraphOMRSQueryPlan.QueryStrategy.Iterate)
-        {
+        if (queryPlan.getQueryStrategy() == GraphOMRSQueryPlan.QueryStrategy.Iterate) {
             // If there are dups in the property maps perform a per-type query
             foundEntities = findEntitiesByPropertyIteratively(validTypeNames,
                     matchProperties,
                     matchCriteria);
-        }
-        else
-        {
+        } else {
             // If there are no dups in property maps perform a delegated query.
             foundEntities = graphStore.findEntitiesByPropertyForTypes(validTypeNames,
                     filterTypeName,
@@ -1276,19 +1226,15 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
                     matchCriteria);
         }
         // Process list of returned entities from sub-methods
-        if (foundEntities != null)
-        {
+        if (foundEntities != null) {
 
             // Perform status and classification filtering
             List<EntityDetail> retainedEntities = new ArrayList<>();
-            for (EntityDetail entity : foundEntities)
-            {
-                if (entity != null)
-                {
+            for (EntityDetail entity : foundEntities) {
+                if (entity != null) {
                     if ((entity.getStatus() != InstanceStatus.DELETED)
                             && (repositoryValidator.verifyInstanceHasRightStatus(limitResultsByStatus, entity))
-                            && (repositoryValidator.verifyEntityIsClassified(limitResultsByClassification, entity)))
-                    {
+                            && (repositoryValidator.verifyEntityIsClassified(limitResultsByClassification, entity))) {
 
                         retainedEntities.add(entity);
                     }
@@ -1303,41 +1249,31 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
     }
 
 
-
-
-
-
     // findEntitiesByPropertyIteratively
-    public List<EntityDetail> findEntitiesByPropertyIteratively(List<String>                  validTypeNames,
-                                                                InstanceProperties            matchProperties,
-                                                                MatchCriteria                 matchCriteria)
+    public List<EntityDetail> findEntitiesByPropertyIteratively(List<String> validTypeNames,
+                                                                InstanceProperties matchProperties,
+                                                                MatchCriteria matchCriteria)
             throws
             InvalidParameterException,
             RepositoryErrorException,
             TypeErrorException,
-            PropertyErrorException
-    {
+            PropertyErrorException {
         final String methodName = "findEntitiesByPropertyIteratively";
         List<EntityDetail> returnEntities = null;
         // Iterate over the validTypeNames and perform a per-type query for each valid type
-        for (String typeName : validTypeNames)
-        {
+        for (String typeName : validTypeNames) {
             TypeDef typeDef = repositoryHelper.getTypeDefByName(repositoryName, typeName);
 
             // Invoke a type specific search. The search will expect the regexp to match fully to the value.
             List<EntityDetail> entitiesForCurrentType = graphStore.findEntitiesByPropertyForType(typeName, matchProperties, matchCriteria, true);
 
-            if (entitiesForCurrentType != null && !entitiesForCurrentType.isEmpty())
-            {
-                if (returnEntities == null)
-                {
+            if (entitiesForCurrentType != null && !entitiesForCurrentType.isEmpty()) {
+                if (returnEntities == null) {
                     returnEntities = new ArrayList<>();
                 }
                 log.info("{}: for type {} found {} entities", methodName, typeDef.getName(), entitiesForCurrentType.size());
                 returnEntities.addAll(entitiesForCurrentType);
-            }
-            else
-            {
+            } else {
                 log.info("{}: for type {} found no entities", methodName, typeDef.getName());
             }
         }
@@ -1345,22 +1281,19 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
     }
 
 
-
     // findEntitiesIteratively
-    public List<EntityDetail> findEntitiesIteratively(List<String>                  validTypeNames,
-                                                      SearchProperties              searchProperties,
-                                                      MatchCriteria                 matchCriteria)
+    public List<EntityDetail> findEntitiesIteratively(List<String> validTypeNames,
+                                                      SearchProperties searchProperties,
+                                                      MatchCriteria matchCriteria)
             throws
             InvalidParameterException,
             RepositoryErrorException,
-            FunctionNotSupportedException
-    {
+            FunctionNotSupportedException {
         final String methodName = "findEntitiesIteratively";
         List<EntityDetail> returnEntities = null;
 
         // Iterate over the validTypeNames and perform a per-type query for each valid type
-        for (String typeName : validTypeNames)
-        {
+        for (String typeName : validTypeNames) {
             TypeDef typeDef = repositoryHelper.getTypeDefByName(repositoryName, typeName);
 
             // Invoke a type specific search. The search will expect the regexp to match fully to the value.
@@ -1368,17 +1301,13 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
                     searchProperties,
                     true);
 
-            if (entitiesForCurrentType != null && !entitiesForCurrentType.isEmpty())
-            {
-                if (returnEntities == null)
-                {
+            if (entitiesForCurrentType != null && !entitiesForCurrentType.isEmpty()) {
+                if (returnEntities == null) {
                     returnEntities = new ArrayList<>();
                 }
                 log.info("{}: for type {} found {} entities", methodName, typeDef.getName(), entitiesForCurrentType.size());
                 returnEntities.addAll(entitiesForCurrentType);
-            }
-            else
-            {
+            } else {
                 log.info("{}: for type {} found no entities", methodName, typeDef.getName());
             }
         }
@@ -1386,22 +1315,19 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
     }
 
 
-
     // findRelationshipsForTypes
-    public List<Relationship> findRelationshipsForTypes(List<String>                  validTypeNames,
-                                                        SearchProperties              searchProperties,
-                                                        MatchCriteria                 matchCriteria)
+    public List<Relationship> findRelationshipsForTypes(List<String> validTypeNames,
+                                                        SearchProperties searchProperties,
+                                                        MatchCriteria matchCriteria)
             throws
             InvalidParameterException,
             RepositoryErrorException,
-            FunctionNotSupportedException
-    {
+            FunctionNotSupportedException {
         final String methodName = "findRelationshipsForTypes";
         List<Relationship> returnRelationships = null;
 
         // Iterate over the validTypeNames and perform a per-type query for each valid type
-        for (String typeName : validTypeNames)
-        {
+        for (String typeName : validTypeNames) {
             TypeDef typeDef = repositoryHelper.getTypeDefByName(repositoryName, typeName);
 
             // Invoke a type specific search. The search will expect the regexp to match fully to the value.
@@ -1409,17 +1335,13 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
                     searchProperties,
                     true);
 
-            if (relationshipsForCurrentType != null && !relationshipsForCurrentType.isEmpty())
-            {
-                if (returnRelationships == null)
-                {
+            if (relationshipsForCurrentType != null && !relationshipsForCurrentType.isEmpty()) {
+                if (returnRelationships == null) {
                     returnRelationships = new ArrayList<>();
                 }
                 log.info("{}: for type {} found {} relationships", methodName, typeDef.getName(), relationshipsForCurrentType.size());
                 returnRelationships.addAll(relationshipsForCurrentType);
-            }
-            else
-            {
+            } else {
                 log.info("{}: for type {} found no relationships", methodName, typeDef.getName());
             }
         }
@@ -1427,21 +1349,17 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
     }
 
 
-
-
     // findRelationshipsByPropertyIteratively
-    public List<Relationship> findRelationshipsByPropertyIteratively(List<String>                  validTypeNames,
-                                                                     InstanceProperties            matchProperties,
-                                                                     MatchCriteria                 matchCriteria)
+    public List<Relationship> findRelationshipsByPropertyIteratively(List<String> validTypeNames,
+                                                                     InstanceProperties matchProperties,
+                                                                     MatchCriteria matchCriteria)
             throws
             InvalidParameterException,
-            RepositoryErrorException
-    {
+            RepositoryErrorException {
         final String methodName = "findRelationshipsByPropertyIteratively";
         List<Relationship> returnRelationships = null;
         // Iterate over the validTypeNames and perform a per-type query for each valid type
-        for (String typeName : validTypeNames)
-        {
+        for (String typeName : validTypeNames) {
             TypeDef typeDef = repositoryHelper.getTypeDefByName(repositoryName, typeName);
 
             // Invoke a type specific search. The search will expect the regexp to match fully to the value.
@@ -1450,17 +1368,13 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
                     matchCriteria,
                     true);
 
-            if (relationshipsForCurrentType != null && !relationshipsForCurrentType.isEmpty())
-            {
-                if (returnRelationships == null)
-                {
+            if (relationshipsForCurrentType != null && !relationshipsForCurrentType.isEmpty()) {
+                if (returnRelationships == null) {
                     returnRelationships = new ArrayList<>();
                 }
                 log.info("{}: for type {} found {} relationships", methodName, typeDef.getName(), relationshipsForCurrentType.size());
                 returnRelationships.addAll(relationshipsForCurrentType);
-            }
-            else
-            {
+            } else {
                 log.info("{}: for type {} found no relationships", methodName, typeDef.getName());
             }
         }
@@ -1470,16 +1384,16 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
 
     // findRelationshipsByProperty
     @Override
-    public  List<Relationship> findRelationshipsByProperty(String                    userId,
-                                                           String                    relationshipTypeGUID,
-                                                           InstanceProperties        matchProperties,
-                                                           MatchCriteria             matchCriteria,
-                                                           int                       fromRelationshipElement,
-                                                           List<InstanceStatus>      limitResultsByStatus,
-                                                           Date                      asOfTime,
-                                                           String                    sequencingProperty,
-                                                           SequencingOrder           sequencingOrder,
-                                                           int                       pageSize)
+    public List<Relationship> findRelationshipsByProperty(String userId,
+                                                          String relationshipTypeGUID,
+                                                          InstanceProperties matchProperties,
+                                                          MatchCriteria matchCriteria,
+                                                          int fromRelationshipElement,
+                                                          List<InstanceStatus> limitResultsByStatus,
+                                                          Date asOfTime,
+                                                          String sequencingProperty,
+                                                          SequencingOrder sequencingOrder,
+                                                          int pageSize)
             throws
             InvalidParameterException,
             TypeErrorException,
@@ -1487,8 +1401,7 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
             PropertyErrorException,
             PagingErrorException,
             FunctionNotSupportedException,
-            UserNotAuthorizedException
-    {
+            UserNotAuthorizedException {
 
 
         final String methodName = "findRelationshipsByProperty";
@@ -1511,8 +1424,7 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
         this.validateTypeGUID(repositoryName, guidParameterName, relationshipTypeGUID, methodName);
 
 
-        if (asOfTime != null)
-        {
+        if (asOfTime != null) {
             log.error("{} does not support asOfTime searches", methodName);
 
             super.reportUnsupportedOptionalFunction(methodName);
@@ -1542,9 +1454,7 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
         String filterTypeName = queryPlan.getFilterTypeName();
 
 
-
-        if (validTypeNames.isEmpty())
-        {
+        if (validTypeNames.isEmpty()) {
             /*
              * Whether filtering was requested or not, short-circuit if there are no valid types as there can be no valid results.
              */
@@ -1554,15 +1464,12 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
         List<Relationship> foundRelationships = null;
 
         // If there were any dups there must be horizontal duplication (across the types within the valid type set).
-        if (queryPlan.getQueryStrategy() == GraphOMRSQueryPlan.QueryStrategy.Iterate)
-        {
+        if (queryPlan.getQueryStrategy() == GraphOMRSQueryPlan.QueryStrategy.Iterate) {
             // If there are dups in the property maps perform a per-type query
             foundRelationships = findRelationshipsByPropertyIteratively(validTypeNames,
                     matchProperties,
                     matchCriteria);
-        }
-        else
-        {
+        } else {
             // If there are no dups in property maps perform a delegated query.
             foundRelationships = graphStore.findRelationshipsByPropertyForTypes(validTypeNames,
                     filterTypeName,
@@ -1575,17 +1482,13 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
         List<Relationship> relationships = null;
 
         // Process list of returned relationships from sub-methods
-        if (foundRelationships != null)
-        {
+        if (foundRelationships != null) {
             // Eliminate soft deleted relationships and apply status  filtering if any was requested
             List<Relationship> retainedRelationships = new ArrayList<>();
-            for (Relationship relationship : foundRelationships)
-            {
-                if (relationship != null)
-                {
+            for (Relationship relationship : foundRelationships) {
+                if (relationship != null) {
                     if ((relationship.getStatus() != InstanceStatus.DELETED)
-                            && (repositoryValidator.verifyInstanceHasRightStatus(limitResultsByStatus, relationship)))
-                    {
+                            && (repositoryValidator.verifyInstanceHasRightStatus(limitResultsByStatus, relationship))) {
                         retainedRelationships.add(relationship);
                     }
                 }
@@ -1600,19 +1503,15 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
     }
 
 
-
-    public  void validateTypeGUID(String sourceName,
-                                  String guidParameterName,
-                                  String guid,
-                                  String methodName)
+    public void validateTypeGUID(String sourceName,
+                                 String guidParameterName,
+                                 String guid,
+                                 String methodName)
             throws
-            TypeErrorException
-    {
-        if  (guid != null)
-        {
+            TypeErrorException {
+        if (guid != null) {
             TypeDef typeDef = repositoryHelper.getTypeDef(repositoryName, guidParameterName, guid, methodName);
-            if (typeDef == null)
-            {
+            if (typeDef == null) {
                 throw new TypeErrorException(OMRSErrorCode.TYPEDEF_ID_NOT_KNOWN.getMessageDefinition(guid, guidParameterName, methodName, sourceName),
                         this.getClass().getName(),
                         methodName);
@@ -1623,16 +1522,16 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
 
     // findEntitiesByPropertyValue
     @Override
-    public  List<EntityDetail> findEntitiesByPropertyValue(String                userId,
-                                                           String                entityTypeGUID,
-                                                           String                searchCriteria,
-                                                           int                   fromEntityElement,
-                                                           List<InstanceStatus>  limitResultsByStatus,
-                                                           List<String>          limitResultsByClassification,
-                                                           Date                  asOfTime,
-                                                           String                sequencingProperty,
-                                                           SequencingOrder       sequencingOrder,
-                                                           int                   pageSize)
+    public List<EntityDetail> findEntitiesByPropertyValue(String userId,
+                                                          String entityTypeGUID,
+                                                          String searchCriteria,
+                                                          int fromEntityElement,
+                                                          List<InstanceStatus> limitResultsByStatus,
+                                                          List<String> limitResultsByClassification,
+                                                          Date asOfTime,
+                                                          String sequencingProperty,
+                                                          SequencingOrder sequencingOrder,
+                                                          int pageSize)
             throws
             InvalidParameterException,
             TypeErrorException,
@@ -1640,8 +1539,7 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
             PropertyErrorException,
             PagingErrorException,
             FunctionNotSupportedException,
-            UserNotAuthorizedException
-    {
+            UserNotAuthorizedException {
 
         final String methodName = "findEntitiesByPropertyValue";
         final String entityTypeGUIDParameterName = "entityTypeGUID";
@@ -1671,7 +1569,7 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
 
 
         // Generate a query plan
-        GraphOMRSQueryPlan queryPlan = new   GraphOMRSQueryPlan(repositoryName,
+        GraphOMRSQueryPlan queryPlan = new GraphOMRSQueryPlan(repositoryName,
                 metadataCollectionId,
                 repositoryHelper,
                 TypeDefCategory.ENTITY_DEF,
@@ -1689,8 +1587,7 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
         String filterTypeName = queryPlan.getFilterTypeName();
 
 
-        if (validTypeNames.isEmpty())
-        {
+        if (validTypeNames.isEmpty()) {
             /*
              * Whether filtering was requested or not, short-circuit if there are no valid types as there can be no valid results.
              */
@@ -1707,19 +1604,15 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
                 shortPropertyNameToQualifiedPropertyNames,
                 searchCriteria);
 
-        if (foundEntities != null)
-        {
+        if (foundEntities != null) {
 
             // Eliminate soft deleted entities and apply status and classification filtering if any was requested
             List<EntityDetail> retainedEntities = new ArrayList<>();
-            for (EntityDetail entity : foundEntities)
-            {
-                if (entity != null)
-                {
+            for (EntityDetail entity : foundEntities) {
+                if (entity != null) {
                     if ((entity.getStatus() != InstanceStatus.DELETED)
                             && (repositoryValidator.verifyInstanceHasRightStatus(limitResultsByStatus, entity))
-                            && (repositoryValidator.verifyEntityIsClassified(limitResultsByClassification, entity)))
-                    {
+                            && (repositoryValidator.verifyEntityIsClassified(limitResultsByClassification, entity))) {
 
                         retainedEntities.add(entity);
                     }
@@ -1733,19 +1626,17 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
     }
 
 
-
-
     // findRelationshipsByPropertyValue
     @Override
-    public  List<Relationship> findRelationshipsByPropertyValue(String                    userId,
-                                                                String                    relationshipTypeGUID,
-                                                                String                    searchCriteria,
-                                                                int                       fromRelationshipElement,
-                                                                List<InstanceStatus>      limitResultsByStatus,
-                                                                Date                      asOfTime,
-                                                                String                    sequencingProperty,
-                                                                SequencingOrder           sequencingOrder,
-                                                                int                       pageSize)
+    public List<Relationship> findRelationshipsByPropertyValue(String userId,
+                                                               String relationshipTypeGUID,
+                                                               String searchCriteria,
+                                                               int fromRelationshipElement,
+                                                               List<InstanceStatus> limitResultsByStatus,
+                                                               Date asOfTime,
+                                                               String sequencingProperty,
+                                                               SequencingOrder sequencingOrder,
+                                                               int pageSize)
             throws
             InvalidParameterException,
             TypeErrorException,
@@ -1753,8 +1644,7 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
             PropertyErrorException,
             PagingErrorException,
             FunctionNotSupportedException,
-            UserNotAuthorizedException
-    {
+            UserNotAuthorizedException {
         final String methodName = "findRelationshipsByPropertyValue";
         final String relationshipTypeGUIDParameterName = "relationshipTypeGUID";
 
@@ -1785,7 +1675,7 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
 
 
         // Generate a query plan
-        GraphOMRSQueryPlan queryPlan = new   GraphOMRSQueryPlan(repositoryName,
+        GraphOMRSQueryPlan queryPlan = new GraphOMRSQueryPlan(repositoryName,
                 metadataCollectionId,
                 repositoryHelper,
                 TypeDefCategory.RELATIONSHIP_DEF,
@@ -1803,8 +1693,7 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
         String filterTypeName = queryPlan.getFilterTypeName();
 
 
-        if (validTypeNames.isEmpty())
-        {
+        if (validTypeNames.isEmpty()) {
             /*
              * Whether filtering was requested or not, short-circuit if there are no valid types as there can be no valid results.
              */
@@ -1819,17 +1708,13 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
 
         List<Relationship> relationships = null;
 
-        if (foundRelationships != null)
-        {
+        if (foundRelationships != null) {
             // Eliminate soft deleted entities and apply status and classification filtering if any was requested
             List<Relationship> retainedRelationships = new ArrayList<>();
-            for (Relationship relationship : foundRelationships)
-            {
-                if (relationship != null)
-                {
+            for (Relationship relationship : foundRelationships) {
+                if (relationship != null) {
                     if ((relationship.getStatus() != InstanceStatus.DELETED)
-                            && (repositoryValidator.verifyInstanceHasRightStatus(limitResultsByStatus, relationship)))
-                    {
+                            && (repositoryValidator.verifyInstanceHasRightStatus(limitResultsByStatus, relationship))) {
                         retainedRelationships.add(relationship);
                     }
                 }
@@ -1842,20 +1727,15 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
     }
 
 
-
-
-
     // findEntitiesByPropertyValue
-    public  List<EntityDetail> findEntitiesByPropertyValueForTypes(List<String>                   validTypeNames,
-                                                                   String                         filterTypeName,
-                                                                   Map<String, TypeDefAttribute>  qualifiedPropertyNameToTypeDefinedAttribute,
-                                                                   Map<String, List<String>>      shortPropertyNameToQualifiedPropertyNames,
-                                                                   String                         searchCriteria)
+    public List<EntityDetail> findEntitiesByPropertyValueForTypes(List<String> validTypeNames,
+                                                                  String filterTypeName,
+                                                                  Map<String, TypeDefAttribute> qualifiedPropertyNameToTypeDefinedAttribute,
+                                                                  Map<String, List<String>> shortPropertyNameToQualifiedPropertyNames,
+                                                                  String searchCriteria)
             throws
             InvalidParameterException,
-            RepositoryErrorException
-
-    {
+            RepositoryErrorException {
 
         final String methodName = "findEntitiesByPropertyValue";
 
@@ -1885,14 +1765,12 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
     }
 
 
-
-
     // findRelationshipsByPropertyValueIteratively
-    public  List<Relationship> findRelationshipsByPropertyValueForTypes(List<String>                   validTypeNames,
-                                                                        String                         filterTypeName,
-                                                                        Map<String, TypeDefAttribute>  qualifiedPropertyNameToTypeDefinedAttribute,
-                                                                        Map<String, List<String>>      shortPropertyNameToQualifiedPropertyNames,
-                                                                        String                         searchCriteria)
+    public List<Relationship> findRelationshipsByPropertyValueForTypes(List<String> validTypeNames,
+                                                                       String filterTypeName,
+                                                                       Map<String, TypeDefAttribute> qualifiedPropertyNameToTypeDefinedAttribute,
+                                                                       Map<String, List<String>> shortPropertyNameToQualifiedPropertyNames,
+                                                                       String searchCriteria)
             throws
             InvalidParameterException,
             TypeErrorException,
@@ -1900,8 +1778,7 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
             PropertyErrorException,
             PagingErrorException,
             FunctionNotSupportedException,
-            UserNotAuthorizedException
-    {
+            UserNotAuthorizedException {
 
         final String methodName = "findRelationshipsByPropertyValueIteratively";
 
@@ -1931,32 +1808,26 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
     }
 
 
-
-
-
     // findEntities
     @Override
-    public List<EntityDetail> findEntities(String                    userId,
-                                           String                    entityTypeGUID,
-                                           List<String>              entitySubtypeGUIDs,
-                                           SearchProperties          matchProperties,
-                                           int                       fromEntityElement,
-                                           List<InstanceStatus>      limitResultsByStatus,
-                                           SearchClassifications     matchClassifications,
-                                           Date                      asOfTime,
-                                           String                    sequencingProperty,
-                                           SequencingOrder           sequencingOrder,
-                                           int                       pageSize)
+    public List<EntityDetail> findEntities(String userId,
+                                           String entityTypeGUID,
+                                           List<String> entitySubtypeGUIDs,
+                                           SearchProperties matchProperties,
+                                           int fromEntityElement,
+                                           List<InstanceStatus> limitResultsByStatus,
+                                           SearchClassifications matchClassifications,
+                                           Date asOfTime,
+                                           String sequencingProperty,
+                                           SequencingOrder sequencingOrder,
+                                           int pageSize)
 
             throws InvalidParameterException,
             RepositoryErrorException,
             TypeErrorException,
             PropertyErrorException,
             PagingErrorException,
-            FunctionNotSupportedException
-
-
-    {
+            FunctionNotSupportedException {
 
         final String methodName = "findEntities";
         final String entityTypeGUIDParameterName = "entityTypeGUID";
@@ -1979,8 +1850,7 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
                 pageSize);
 
 
-        if (asOfTime != null)
-        {
+        if (asOfTime != null) {
             log.error("{} does not support asOfTime searches", methodName);
 
             super.reportUnsupportedOptionalFunction(methodName);
@@ -2006,8 +1876,7 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
         String filterTypeName = queryPlan.getFilterTypeName();
 
 
-        if (validTypeNames.isEmpty())
-        {
+        if (validTypeNames.isEmpty()) {
             /*
              * Whether filtering was requested or not, short-circuit if there are no valid types as there can be no valid results.
              */
@@ -2017,15 +1886,12 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
         List<EntityDetail> foundEntities = null;
 
         // If there were any dups there must be horizontal duplication (across the types within the valid type set).
-        if (queryPlan.getQueryStrategy() == GraphOMRSQueryPlan.QueryStrategy.Iterate)
-        {
+        if (queryPlan.getQueryStrategy() == GraphOMRSQueryPlan.QueryStrategy.Iterate) {
             // If there are dups in the property maps perform a per-type query
             foundEntities = findEntitiesIteratively(validTypeNames,
                     matchProperties,
                     MatchCriteria.ANY);
-        }
-        else
-        {
+        } else {
             // If there are no dups in property maps perform a delegated query.
             foundEntities = graphStore.findEntitiesForTypes(validTypeNames,
                     filterTypeName,
@@ -2035,20 +1901,16 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
         }
 
 
-        if (foundEntities != null)
-        {
+        if (foundEntities != null) {
             /*
              * Eliminate soft deleted entities and apply status and classification filtering if any was requested
              */
             List<EntityDetail> retainedEntities = new ArrayList<>();
-            for (EntityDetail entity : foundEntities)
-            {
-                if (entity != null)
-                {
+            for (EntityDetail entity : foundEntities) {
+                if (entity != null) {
                     if ((entity.getStatus() != InstanceStatus.DELETED)
                             && (repositoryValidator.verifyInstanceHasRightStatus(limitResultsByStatus, entity))
-                            && (repositoryValidator.verifyMatchingClassifications(matchClassifications, entity)))
-                    {
+                            && (repositoryValidator.verifyMatchingClassifications(matchClassifications, entity))) {
 
                         retainedEntities.add(entity);
                     }
@@ -2063,62 +1925,59 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
     }
 
 
-
-
     /**
      * Return a list of relationships that match the requested conditions.  The results can be received as a series of
      * pages.
      *
-     * @param userId unique identifier for requesting user.
-     * @param relationshipTypeGUID unique identifier (guid) for the relationship's type.  Null means all types
-     *                             (but may be slow so not recommended).
+     * @param userId                   unique identifier for requesting user.
+     * @param relationshipTypeGUID     unique identifier (guid) for the relationship's type.  Null means all types
+     *                                 (but may be slow so not recommended).
      * @param relationshipSubtypeGUIDs optional list of the unique identifiers (guids) for subtypes of the
      *                                 relationshipTypeGUID to include in the search results. Null means all subtypes.
-     * @param matchProperties Optional list of relationship property conditions to match.
-     * @param fromRelationshipElement the starting element number of the entities to return.
-     *                                This is used when retrieving elements
-     *                                beyond the first page of results. Zero means start from the first element.
-     * @param limitResultsByStatus By default, relationships in all statuses are returned.  However, it is possible
-     *                             to specify a list of statuses (eg ACTIVE) to restrict the results to.  Null means all
-     *                             status values.
-     * @param asOfTime Requests a historical query of the relationships for the entity.  Null means return the
-     *                 present values.
-     * @param sequencingProperty String name of the property that is to be used to sequence the results.
-     *                           Null means do not sequence on a property name (see SequencingOrder).
-     * @param sequencingOrder Enum defining how the results should be ordered.
-     * @param pageSize the maximum number of result relationships that can be returned on this request.  Zero means
-     *                 unrestricted return results size.
+     * @param matchProperties          Optional list of relationship property conditions to match.
+     * @param fromRelationshipElement  the starting element number of the entities to return.
+     *                                 This is used when retrieving elements
+     *                                 beyond the first page of results. Zero means start from the first element.
+     * @param limitResultsByStatus     By default, relationships in all statuses are returned.  However, it is possible
+     *                                 to specify a list of statuses (eg ACTIVE) to restrict the results to.  Null means all
+     *                                 status values.
+     * @param asOfTime                 Requests a historical query of the relationships for the entity.  Null means return the
+     *                                 present values.
+     * @param sequencingProperty       String name of the property that is to be used to sequence the results.
+     *                                 Null means do not sequence on a property name (see SequencingOrder).
+     * @param sequencingOrder          Enum defining how the results should be ordered.
+     * @param pageSize                 the maximum number of result relationships that can be returned on this request.  Zero means
+     *                                 unrestricted return results size.
      * @return a list of relationships.  Null means no matching relationships.
-     * @throws InvalidParameterException one of the parameters is invalid or null.
-     * @throws TypeErrorException the type guid passed on the request is not known by the
-     *                              metadata collection.
-     * @throws RepositoryErrorException there is a problem communicating with the metadata repository where
-     *                                    the metadata collection is stored.
-     * @throws PropertyErrorException the properties specified are not valid for any of the requested types of
-     *                                  relationships.
-     * @throws PagingErrorException the paging/sequencing parameters are set up incorrectly.
+     * @throws InvalidParameterException     one of the parameters is invalid or null.
+     * @throws TypeErrorException            the type guid passed on the request is not known by the
+     *                                       metadata collection.
+     * @throws RepositoryErrorException      there is a problem communicating with the metadata repository where
+     *                                       the metadata collection is stored.
+     * @throws PropertyErrorException        the properties specified are not valid for any of the requested types of
+     *                                       relationships.
+     * @throws PagingErrorException          the paging/sequencing parameters are set up incorrectly.
      * @throws FunctionNotSupportedException the repository does not support one of the provided parameters.
      * @see OMRSRepositoryHelper#getExactMatchRegex(String)
      */
     @Override
-    public  List<Relationship> findRelationships(String                    userId,
-                                                 String                    relationshipTypeGUID,
-                                                 List<String>              relationshipSubtypeGUIDs,
-                                                 SearchProperties          matchProperties,
-                                                 int                       fromRelationshipElement,
-                                                 List<InstanceStatus>      limitResultsByStatus,
-                                                 Date                      asOfTime,
-                                                 String                    sequencingProperty,
-                                                 SequencingOrder           sequencingOrder,
-                                                 int                       pageSize)
+    public List<Relationship> findRelationships(String userId,
+                                                String relationshipTypeGUID,
+                                                List<String> relationshipSubtypeGUIDs,
+                                                SearchProperties matchProperties,
+                                                int fromRelationshipElement,
+                                                List<InstanceStatus> limitResultsByStatus,
+                                                Date asOfTime,
+                                                String sequencingProperty,
+                                                SequencingOrder sequencingOrder,
+                                                int pageSize)
 
             throws InvalidParameterException,
             TypeErrorException,
             RepositoryErrorException,
             PropertyErrorException,
             PagingErrorException,
-            FunctionNotSupportedException
-    {
+            FunctionNotSupportedException {
 
         final String methodName = "findRelationships";
         final String relationshipTypeGUIDParameterName = "relationshipTypeGUID";
@@ -2138,8 +1997,7 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
                 pageSize);
 
 
-        if (asOfTime != null)
-        {
+        if (asOfTime != null) {
             log.error("{} does not support asOfTime searches", methodName);
 
             super.reportUnsupportedOptionalFunction(methodName);
@@ -2169,8 +2027,7 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
         String filterTypeName = queryPlan.getFilterTypeName();
 
 
-        if (validTypeNames.isEmpty())
-        {
+        if (validTypeNames.isEmpty()) {
             /*
              * Whether filtering was requested or not, short-circuit if there are no valid types as there can be no valid results.
              */
@@ -2180,15 +2037,12 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
         List<Relationship> foundRelationships = null;
 
         // If there were any dups there must be horizontal duplication (across the types within the valid type set).
-        if (queryPlan.getQueryStrategy() == GraphOMRSQueryPlan.QueryStrategy.Iterate)
-        {
+        if (queryPlan.getQueryStrategy() == GraphOMRSQueryPlan.QueryStrategy.Iterate) {
             // If there are dups in the property maps perform a per-type query
             foundRelationships = findRelationshipsForTypes(validTypeNames,
                     matchProperties,
                     MatchCriteria.ANY);
-        }
-        else
-        {
+        } else {
             // If there are no dups in property maps perform a delegated query.
             foundRelationships = graphStore.findRelationshipsForTypes(validTypeNames,
                     filterTypeName,
@@ -2200,20 +2054,16 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
 
         List<Relationship> relationships = null;
 
-        if (foundRelationships != null)
-        {
+        if (foundRelationships != null) {
             /*
              * Eliminate soft deleted relationships and apply status filtering if any was requested
              */
             List<Relationship> retainedRelationships = new ArrayList<>();
 
-            for (Relationship relationship : foundRelationships)
-            {
-                if (relationship != null)
-                {
+            for (Relationship relationship : foundRelationships) {
+                if (relationship != null) {
                     if ((relationship.getStatus() != InstanceStatus.DELETED)
-                            && (repositoryValidator.verifyInstanceHasRightStatus(limitResultsByStatus, relationship)))
-                    {
+                            && (repositoryValidator.verifyInstanceHasRightStatus(limitResultsByStatus, relationship))) {
                         retainedRelationships.add(relationship);
                     }
                 }
@@ -2227,28 +2077,23 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
     }
 
 
-
-
-
-
     // classifyEntity
     @Override
-    public EntityDetail classifyEntity(String               userId,
-                                       String               entityGUID,
-                                       String               classificationName,
-                                       InstanceProperties   classificationProperties)
+    public EntityDetail classifyEntity(String userId,
+                                       String entityGUID,
+                                       String classificationName,
+                                       InstanceProperties classificationProperties)
             throws
             InvalidParameterException,
             RepositoryErrorException,
             EntityNotKnownException,
             ClassificationErrorException,
             PropertyErrorException,
-            UserNotAuthorizedException
-    {
-        final String  methodName                  = "classifyEntity";
-        final String  entityGUIDParameterName     = "entityGUID";
-        final String  classificationParameterName = "classificationName";
-        final String  propertiesParameterName     = "classificationProperties";
+            UserNotAuthorizedException {
+        final String methodName = "classifyEntity";
+        final String entityGUIDParameterName = "entityGUID";
+        final String classificationParameterName = "classificationName";
+        final String propertiesParameterName = "classificationProperties";
 
         /*
          * Validate parameters
@@ -2267,8 +2112,7 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
 
             entity = graphStore.getEntityDetailFromStore(entityGUID);
 
-        }
-        catch (EntityProxyOnlyException | EntityNotKnownException e) {
+        } catch (EntityProxyOnlyException | EntityNotKnownException e) {
             log.warn("{} entity wth GUID {} not found or only a proxy", methodName, entityGUID);
 
             throw new EntityNotKnownException(OMRSErrorCode.ENTITY_NOT_KNOWN.getMessageDefinition(entityGUID, methodName, repositoryName),
@@ -2276,8 +2120,7 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
                     methodName,
                     e);
 
-        }
-        catch (RepositoryErrorException e) {
+        } catch (RepositoryErrorException e) {
             log.error("{} repository exception during retrieval of entity wth GUID {}", methodName, entityGUID);
             throw e;
         }
@@ -2292,8 +2135,7 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
         repositoryValidator.validateClassification(repositoryName, classificationParameterName, classificationName, entityType.getTypeDefName(), methodName);
 
         Classification newClassification;
-        try
-        {
+        try {
             repositoryValidator.validateClassificationProperties(repositoryName,
                     classificationName,
                     propertiesParameterName,
@@ -2312,13 +2154,9 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
                     ClassificationOrigin.ASSIGNED,
                     null,
                     classificationProperties);
-        }
-        catch (PropertyErrorException  error)
-        {
+        } catch (PropertyErrorException error) {
             throw error;
-        }
-        catch (Throwable   error)
-        {
+        } catch (Throwable error) {
             throw new ClassificationErrorException(OMRSErrorCode.INVALID_CLASSIFICATION_FOR_ENTITY.getMessageDefinition(),
                     this.getClass().getName(),
                     methodName,
@@ -2339,26 +2177,25 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
 
     // classifyEntity
     @Override
-    public   EntityDetail classifyEntity(String               userId,
-                                         String               entityGUID,
-                                         String               classificationName,
-                                         String               externalSourceGUID,
-                                         String               externalSourceName,
-                                         ClassificationOrigin classificationOrigin,
-                                         String               classificationOriginGUID,
-                                         InstanceProperties   classificationProperties)
+    public EntityDetail classifyEntity(String userId,
+                                       String entityGUID,
+                                       String classificationName,
+                                       String externalSourceGUID,
+                                       String externalSourceName,
+                                       ClassificationOrigin classificationOrigin,
+                                       String classificationOriginGUID,
+                                       InstanceProperties classificationProperties)
             throws InvalidParameterException,
             RepositoryErrorException,
             EntityNotKnownException,
             ClassificationErrorException,
             PropertyErrorException,
             UserNotAuthorizedException,
-            FunctionNotSupportedException
-    {
-        final String  methodName = "classifyEntity (detailed)";
-        final String  entityGUIDParameterName     = "entityGUID";
-        final String  classificationParameterName = "classificationName";
-        final String  propertiesParameterName     = "classificationProperties";
+            FunctionNotSupportedException {
+        final String methodName = "classifyEntity (detailed)";
+        final String entityGUIDParameterName = "entityGUID";
+        final String classificationParameterName = "classificationName";
+        final String propertiesParameterName = "classificationProperties";
 
         /*
          * Validate parameters
@@ -2377,8 +2214,7 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
 
             entity = graphStore.getEntityDetailFromStore(entityGUID);
 
-        }
-        catch (EntityProxyOnlyException | EntityNotKnownException e) {
+        } catch (EntityProxyOnlyException | EntityNotKnownException e) {
             log.warn("{} entity wth GUID {} not found or only a proxy", methodName, entityGUID);
 
             throw new EntityNotKnownException(OMRSErrorCode.ENTITY_NOT_KNOWN.getMessageDefinition(entityGUID, methodName, repositoryName),
@@ -2386,8 +2222,7 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
                     methodName,
                     e);
 
-        }
-        catch (RepositoryErrorException e) {
+        } catch (RepositoryErrorException e) {
             log.error("{} repository exception during retrieval of entity wth GUID {}", methodName, entityGUID);
             throw e;
         }
@@ -2402,8 +2237,7 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
         repositoryValidator.validateClassification(repositoryName, classificationParameterName, classificationName, entityType.getTypeDefName(), methodName);
 
         Classification newClassification;
-        try
-        {
+        try {
             repositoryValidator.validateClassificationProperties(repositoryName,
                     classificationName,
                     propertiesParameterName,
@@ -2413,8 +2247,7 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
             /*
              * Validation complete - build the new classification
              */
-            if (externalSourceGUID == null)
-            {
+            if (externalSourceGUID == null) {
                 newClassification = repositoryHelper.getNewClassification(repositoryName,
                         null,
                         InstanceProvenanceType.LOCAL_COHORT,
@@ -2424,9 +2257,7 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
                         classificationOrigin,
                         classificationOriginGUID,
                         classificationProperties);
-            }
-            else
-            {
+            } else {
                 newClassification = repositoryHelper.getNewClassification(repositoryName,
                         externalSourceGUID,
                         InstanceProvenanceType.EXTERNAL_SOURCE,
@@ -2439,13 +2270,9 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
                 newClassification.setMetadataCollectionName(externalSourceName);
                 newClassification.setReplicatedBy(metadataCollectionId);
             }
-        }
-        catch (PropertyErrorException  error)
-        {
+        } catch (PropertyErrorException error) {
             throw error;
-        }
-        catch (Throwable   error)
-        {
+        } catch (Throwable error) {
             throw new ClassificationErrorException(OMRSErrorCode.INVALID_CLASSIFICATION_FOR_ENTITY.getMessageDefinition(),
                     this.getClass().getName(),
                     methodName,
@@ -2466,16 +2293,15 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
 
     // declassifyEntity
     @Override
-    public EntityDetail declassifyEntity(String  userId,
-                                         String  entityGUID,
-                                         String  classificationName)
+    public EntityDetail declassifyEntity(String userId,
+                                         String entityGUID,
+                                         String classificationName)
             throws
             InvalidParameterException,
             RepositoryErrorException,
             EntityNotKnownException,
             ClassificationErrorException,
-            UserNotAuthorizedException
-    {
+            UserNotAuthorizedException {
         final String methodName = "declassifyEntity";
 
         /*
@@ -2491,8 +2317,7 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
 
             entity = graphStore.getEntityDetailFromStore(entityGUID);
 
-        }
-        catch (EntityProxyOnlyException | EntityNotKnownException e) {
+        } catch (EntityProxyOnlyException | EntityNotKnownException e) {
             log.warn("{} entity wth GUID {} not found or only a proxy", methodName, entityGUID);
 
             throw new EntityNotKnownException(OMRSErrorCode.ENTITY_PROXY_ONLY.getMessageDefinition(methodName,
@@ -2502,12 +2327,10 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
                     methodName,
                     e);
 
-        }
-        catch (RepositoryErrorException e) {
+        } catch (RepositoryErrorException e) {
             log.error("{} repository exception during retrieval of entity wth GUID {}", methodName, entityGUID);
             throw e;
         }
-
 
 
         repositoryValidator.validateEntityFromStore(repositoryName, entityGUID, entity, methodName);
@@ -2521,21 +2344,19 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
     }
 
 
-
-
     // findEntitiesByClassification
     @Override
-    public  List<EntityDetail> findEntitiesByClassification(String                    userId,
-                                                            String                    entityTypeGUID,
-                                                            String                    classificationName,
-                                                            InstanceProperties        matchClassificationProperties,
-                                                            MatchCriteria             matchCriteria,
-                                                            int                       fromEntityElement,
-                                                            List<InstanceStatus>      limitResultsByStatus,
-                                                            Date                      asOfTime,
-                                                            String                    sequencingProperty,
-                                                            SequencingOrder           sequencingOrder,
-                                                            int                       pageSize)
+    public List<EntityDetail> findEntitiesByClassification(String userId,
+                                                           String entityTypeGUID,
+                                                           String classificationName,
+                                                           InstanceProperties matchClassificationProperties,
+                                                           MatchCriteria matchCriteria,
+                                                           int fromEntityElement,
+                                                           List<InstanceStatus> limitResultsByStatus,
+                                                           Date asOfTime,
+                                                           String sequencingProperty,
+                                                           SequencingOrder sequencingOrder,
+                                                           int pageSize)
             throws
             InvalidParameterException,
             TypeErrorException,
@@ -2544,8 +2365,7 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
             FunctionNotSupportedException,
             PropertyErrorException,
             PagingErrorException,
-            UserNotAuthorizedException
-    {
+            UserNotAuthorizedException {
 
 
         /*
@@ -2573,8 +2393,7 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
                 pageSize);
 
 
-        if (asOfTime != null)
-        {
+        if (asOfTime != null) {
             log.error("{} does not support asOfTime searches", methodName);
 
             super.reportUnsupportedOptionalFunction(methodName);
@@ -2592,8 +2411,7 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
          */
 
         String filterTypeName = null;
-        if (entityTypeGUID != null)
-        {
+        if (entityTypeGUID != null) {
             TypeDef typeDef = repositoryHelper.getTypeDef(repositoryName, entityTypeGUIDParameterName, entityTypeGUID, methodName);
             filterTypeName = typeDef.getName();
         }
@@ -2602,12 +2420,9 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
         List<TypeDef> allTypeDefs = activeTypes.getTypeDefs();
 
         List<String> validTypeNames = new ArrayList<>();
-        if (filterTypeName != null)
-        {
-            for (TypeDef typeDef : allTypeDefs)
-            {
-                if (typeDef.getCategory() == TypeDefCategory.ENTITY_DEF)
-                {
+        if (filterTypeName != null) {
+            for (TypeDef typeDef : allTypeDefs) {
+                if (typeDef.getCategory() == TypeDefCategory.ENTITY_DEF) {
                     String actualTypeName = typeDef.getName();
 
                     /*
@@ -2615,14 +2430,12 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
                      * current type matches the expected type or is one of its sub-types.
                      */
                     boolean typeMatch = repositoryHelper.isTypeOf(metadataCollectionId, actualTypeName, filterTypeName);
-                    if (typeMatch)
-                    {
+                    if (typeMatch) {
                         validTypeNames.add(actualTypeName);
                     }
                 }
             }
-            if (validTypeNames.isEmpty())
-            {
+            if (validTypeNames.isEmpty()) {
                 /*
                  * Filtering was requested but there are no valid types based on the specified GUID.
                  */
@@ -2640,8 +2453,7 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
                 filterTypeName != null,
                 validTypeNames);
 
-        if (entitiesWithClassification == null || entitiesWithClassification.isEmpty())
-        {
+        if (entitiesWithClassification == null || entitiesWithClassification.isEmpty()) {
             return null;
         }
 
@@ -2651,10 +2463,8 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
 
         List<EntityDetail> retainedEntities = null;
 
-        for (EntityDetail entity : entitiesWithClassification)
-        {
-            if (entity != null)
-            {
+        for (EntityDetail entity : entitiesWithClassification) {
+            if (entity != null) {
                 /*
                  * Assume the entity is to be retained unless it fails any of the filter conditions below...
                  */
@@ -2664,19 +2474,16 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
                  * Status filter
                  * Eliminate soft deleted entities and apply status filtering if any was requested
                  */
-                if (   (entity.getStatus() == InstanceStatus.DELETED)
-                        || (! repositoryValidator.verifyInstanceHasRightStatus(limitResultsByStatus, entity)))
-                {
+                if ((entity.getStatus() == InstanceStatus.DELETED)
+                        || (!repositoryValidator.verifyInstanceHasRightStatus(limitResultsByStatus, entity))) {
                     retainEntity = false;
                 }
 
                 /*
                  * Check if this entity is worth keeping
                  */
-                if (retainEntity)
-                {
-                    if (retainedEntities == null)
-                    {
+                if (retainEntity) {
+                    if (retainedEntities == null) {
                         retainedEntities = new ArrayList<>();
                     }
                     retainedEntities.add(entity);
@@ -2685,12 +2492,9 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
         }
 
         List<EntityDetail> returnEntities = null;
-        if (retainedEntities == null)
-        {
+        if (retainedEntities == null) {
             log.info("{}: found no entities", methodName);
-        }
-        else
-        {
+        } else {
             log.info("{}: found {} entities", methodName, retainedEntities.size());
             returnEntities = repositoryHelper.formatEntityResults(retainedEntities, fromEntityElement, sequencingProperty, sequencingOrder, pageSize);
         }
@@ -2700,21 +2504,19 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
     }
 
 
-
     // deleteEntity
     @Override
-    public EntityDetail deleteEntity(String    userId,
-                                     String    typeDefGUID,
-                                     String    typeDefName,
-                                     String    obsoleteEntityGUID)
+    public EntityDetail deleteEntity(String userId,
+                                     String typeDefGUID,
+                                     String typeDefName,
+                                     String obsoleteEntityGUID)
             throws
             InvalidParameterException,
             RepositoryErrorException,
             EntityNotKnownException,
-            UserNotAuthorizedException
-    {
+            UserNotAuthorizedException {
         final String methodName = "deleteEntity";
-        final String parameterName  = "obsoleteEntityGUID";
+        final String parameterName = "obsoleteEntityGUID";
 
         /*
          * Validate parameters
@@ -2730,8 +2532,7 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
             entityDetail = graphStore.getEntityDetailFromStore(obsoleteEntityGUID);
             repositoryValidator.validateEntityFromStore(repositoryName, obsoleteEntityGUID, entityDetail, methodName);
 
-        }
-        catch (EntityProxyOnlyException e) {
+        } catch (EntityProxyOnlyException e) {
 
             log.warn("{} entity wth GUID {} only a proxy", methodName, obsoleteEntityGUID);
 
@@ -2739,8 +2540,7 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
                     this.getClass().getName(),
                     methodName,
                     e);
-        }
-        catch (EntityNotKnownException e) {
+        } catch (EntityNotKnownException e) {
 
             log.error("{} entity wth GUID {} not found", methodName, obsoleteEntityGUID);
 
@@ -2807,16 +2607,15 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
 
     // restoreEntity
     @Override
-    public EntityDetail restoreEntity(String    userId,
-                                      String    deletedEntityGUID)
+    public EntityDetail restoreEntity(String userId,
+                                      String deletedEntityGUID)
             throws
             InvalidParameterException,
             RepositoryErrorException,
             EntityNotKnownException,
             EntityNotDeletedException,
-            UserNotAuthorizedException
-    {
-        final String methodName    = "restoreEntity";
+            UserNotAuthorizedException {
+        final String methodName = "restoreEntity";
         final String parameterName = "deletedEntityGUID";
 
         /*
@@ -2835,8 +2634,7 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
 
             repositoryValidator.validateEntityIsDeleted(repositoryName, entity, methodName);
 
-        }
-        catch (EntityProxyOnlyException e) {
+        } catch (EntityProxyOnlyException e) {
             log.warn("{} entity wth GUID {} only a proxy", methodName, deletedEntityGUID);
 
             throw new EntityNotKnownException(OMRSErrorCode.ENTITY_NOT_KNOWN.getMessageDefinition(deletedEntityGUID, methodName, repositoryName),
@@ -2863,18 +2661,17 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
 
     // deleteRelationship
     @Override
-    public Relationship deleteRelationship(String    userId,
-                                           String    typeDefGUID,
-                                           String    typeDefName,
-                                           String    obsoleteRelationshipGUID)
+    public Relationship deleteRelationship(String userId,
+                                           String typeDefGUID,
+                                           String typeDefName,
+                                           String obsoleteRelationshipGUID)
             throws
             InvalidParameterException,
             RepositoryErrorException,
             RelationshipNotKnownException,
-            UserNotAuthorizedException
-    {
-        final String  methodName = "deleteRelationship";
-        final String  parameterName = "obsoleteRelationshipGUID";
+            UserNotAuthorizedException {
+        final String methodName = "deleteRelationship";
+        final String parameterName = "obsoleteRelationshipGUID";
 
 
         /*
@@ -2885,14 +2682,14 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
         /*
          * Locate relationship
          */
-        Relationship  relationship  = this.getRelationship(userId, obsoleteRelationshipGUID);
+        Relationship relationship = this.getRelationship(userId, obsoleteRelationshipGUID);
 
         repositoryValidator.validateTypeForInstanceDelete(repositoryName, typeDefGUID, typeDefName, relationship, methodName);
 
         /*
          * A delete is a soft-delete that updates the status to DELETED.
          */
-        Relationship   updatedRelationship = new Relationship(relationship);
+        Relationship updatedRelationship = new Relationship(relationship);
 
         updatedRelationship.setStatusOnDelete(relationship.getStatus());
         updatedRelationship.setStatus(InstanceStatus.DELETED);
@@ -2907,16 +2704,15 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
 
     // restoreRelationship
     @Override
-    public Relationship restoreRelationship(String    userId,
-                                            String    deletedRelationshipGUID)
+    public Relationship restoreRelationship(String userId,
+                                            String deletedRelationshipGUID)
             throws
             InvalidParameterException,
             RepositoryErrorException,
             RelationshipNotKnownException,
             RelationshipNotDeletedException,
-            UserNotAuthorizedException
-    {
-        final String methodName    = "restoreRelationship";
+            UserNotAuthorizedException {
+        final String methodName = "restoreRelationship";
         final String parameterName = "deletedRelationshipGUID";
 
         /*
@@ -2927,7 +2723,7 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
         /*
          * Locate relationship
          */
-        Relationship  relationship  = graphStore.getRelationshipFromStore(deletedRelationshipGUID);
+        Relationship relationship = graphStore.getRelationshipFromStore(deletedRelationshipGUID);
 
         repositoryValidator.validateRelationshipFromStore(repositoryName, deletedRelationshipGUID, relationship, methodName);
         repositoryValidator.validateRelationshipIsDeleted(repositoryName, relationship, methodName);
@@ -2949,23 +2745,21 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
     }
 
 
-
     // reIdentifyEntity
     @Override
-    public EntityDetail reIdentifyEntity(String     userId,
-                                         String     typeDefGUID,
-                                         String     typeDefName,
-                                         String     entityGUID,
-                                         String     newEntityGUID)
+    public EntityDetail reIdentifyEntity(String userId,
+                                         String typeDefGUID,
+                                         String typeDefName,
+                                         String entityGUID,
+                                         String newEntityGUID)
             throws
             InvalidParameterException,
             RepositoryErrorException,
             EntityNotKnownException,
-            UserNotAuthorizedException
-    {
-        final String  methodName = "reIdentifyEntity";
-        final String  instanceParameterName = "entityGUID";
-        final String  newInstanceParameterName = "newEntityGUID";
+            UserNotAuthorizedException {
+        final String methodName = "reIdentifyEntity";
+        final String instanceParameterName = "entityGUID";
+        final String newInstanceParameterName = "newEntityGUID";
 
         /*
          * Validate parameters
@@ -2987,8 +2781,7 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
             entity = graphStore.getEntityDetailFromStore(entityGUID);
 
             repositoryValidator.validateEntityFromStore(repositoryName, entityGUID, entity, methodName);
-        }
-        catch (EntityProxyOnlyException e) {
+        } catch (EntityProxyOnlyException e) {
             log.warn("{} entity wth GUID {} only a proxy", methodName, entityGUID);
 
             throw new EntityNotKnownException(OMRSErrorCode.ENTITY_NOT_KNOWN.getMessageDefinition(entityGUID, methodName, repositoryName),
@@ -3015,24 +2808,22 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
     }
 
 
-
     // reHomeEntity
     @Override
-    public EntityDetail reHomeEntity(String         userId,
-                                     String         entityGUID,
-                                     String         typeDefGUID,
-                                     String         typeDefName,
-                                     String         homeMetadataCollectionId,
-                                     String         newHomeMetadataCollectionId,
-                                     String         newHomeMetadataCollectionName)
+    public EntityDetail reHomeEntity(String userId,
+                                     String entityGUID,
+                                     String typeDefGUID,
+                                     String typeDefName,
+                                     String homeMetadataCollectionId,
+                                     String newHomeMetadataCollectionId,
+                                     String newHomeMetadataCollectionName)
             throws
             InvalidParameterException,
             RepositoryErrorException,
             EntityNotKnownException,
-            UserNotAuthorizedException
-    {
-        final String methodName                = "reHomeEntity";
-        final String entityParameterName       = "entityGUID";
+            UserNotAuthorizedException {
+        final String methodName = "reHomeEntity";
+        final String entityParameterName = "entityGUID";
 
         /*
          * Validate parameters
@@ -3058,8 +2849,7 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
 
             repositoryValidator.validateEntityCanBeRehomed(repositoryName, metadataCollectionId, entity, methodName);
 
-        }
-        catch (EntityProxyOnlyException e) {
+        } catch (EntityProxyOnlyException e) {
             log.warn("{} entity wth GUID {} only a proxy", methodName, entityGUID);
 
             throw new EntityNotKnownException(OMRSErrorCode.ENTITY_NOT_KNOWN.getMessageDefinition(entityGUID, methodName, repositoryName),
@@ -3072,7 +2862,7 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
         /*
          * Validation complete - ok to make changes
          */
-        EntityDetail   updatedEntity = new EntityDetail(entity);
+        EntityDetail updatedEntity = new EntityDetail(entity);
 
         updatedEntity.setMetadataCollectionId(newHomeMetadataCollectionId);
         updatedEntity.setMetadataCollectionName(newHomeMetadataCollectionName);
@@ -3088,8 +2878,8 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
 
     // reTypeEntity
     @Override
-    public EntityDetail reTypeEntity(String         userId,
-                                     String         entityGUID,
+    public EntityDetail reTypeEntity(String userId,
+                                     String entityGUID,
                                      TypeDefSummary currentTypeDefSummary,
                                      TypeDefSummary newTypeDefSummary)
             throws
@@ -3099,12 +2889,11 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
             PropertyErrorException,
             ClassificationErrorException,
             EntityNotKnownException,
-            UserNotAuthorizedException
-    {
-        final String  methodName                  = "reTypeEntity";
-        final String  entityParameterName         = "entityGUID";
-        final String  currentTypeDefParameterName = "currentTypeDefSummary";
-        final String  newTypeDefParameterName     = "newTypeDefSummary";
+            UserNotAuthorizedException {
+        final String methodName = "reTypeEntity";
+        final String entityParameterName = "entityGUID";
+        final String currentTypeDefParameterName = "currentTypeDefSummary";
+        final String newTypeDefParameterName = "newTypeDefSummary";
 
         /*
          * Validate parameters
@@ -3145,8 +2934,7 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
                     entity.getClassifications(),
                     newTypeDefSummary.getName(),
                     methodName);
-        }
-        catch (EntityProxyOnlyException e) {
+        } catch (EntityProxyOnlyException e) {
             log.warn("{} entity wth GUID {} only a proxy", methodName, entityGUID);
 
             throw new EntityNotKnownException(OMRSErrorCode.ENTITY_NOT_KNOWN.getMessageDefinition(entityGUID, methodName, repositoryName),
@@ -3159,8 +2947,8 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
         /*
          * Validation complete - ok to make changes
          */
-        EntityDetail   updatedEntity = new EntityDetail(entity);
-        InstanceType   newInstanceType = repositoryHelper.getNewInstanceType(repositoryName, newTypeDefSummary);
+        EntityDetail updatedEntity = new EntityDetail(entity);
+        InstanceType newInstanceType = repositoryHelper.getNewInstanceType(repositoryName, newTypeDefSummary);
 
         updatedEntity.setType(newInstanceType);
 
@@ -3174,20 +2962,19 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
 
     // reIdentifyRelationship
     @Override
-    public Relationship reIdentifyRelationship(String     userId,
-                                               String     typeDefGUID,
-                                               String     typeDefName,
-                                               String     relationshipGUID,
-                                               String     newRelationshipGUID)
+    public Relationship reIdentifyRelationship(String userId,
+                                               String typeDefGUID,
+                                               String typeDefName,
+                                               String relationshipGUID,
+                                               String newRelationshipGUID)
             throws
             InvalidParameterException,
             RepositoryErrorException,
             RelationshipNotKnownException,
-            UserNotAuthorizedException
-    {
-        final String  methodName = "reIdentifyRelationship";
-        final String  instanceParameterName = "relationshipGUID";
-        final String  newInstanceParameterName = "newRelationshipGUID";
+            UserNotAuthorizedException {
+        final String methodName = "reIdentifyRelationship";
+        final String instanceParameterName = "relationshipGUID";
+        final String newInstanceParameterName = "newRelationshipGUID";
 
         /*
          * Validate parameters
@@ -3204,7 +2991,7 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
         /*
          * Locate relationship
          */
-        Relationship  relationship  = this.getRelationship(userId, relationshipGUID);
+        Relationship relationship = this.getRelationship(userId, relationshipGUID);
 
         repositoryValidator.validateRelationshipCanBeUpdated(repositoryName, metadataCollectionId, relationship, methodName);
 
@@ -3212,7 +2999,7 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
         /*
          * Validation complete - ok to make changes
          */
-        Relationship   updatedRelationship = new Relationship(relationship);
+        Relationship updatedRelationship = new Relationship(relationship);
 
         updatedRelationship.setGUID(newRelationshipGUID);
 
@@ -3227,8 +3014,8 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
 
     // reTypeRelationship
     @Override
-    public Relationship reTypeRelationship(String         userId,
-                                           String         relationshipGUID,
+    public Relationship reTypeRelationship(String userId,
+                                           String relationshipGUID,
                                            TypeDefSummary currentTypeDefSummary,
                                            TypeDefSummary newTypeDefSummary)
             throws
@@ -3237,13 +3024,12 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
             TypeErrorException,
             PropertyErrorException,
             RelationshipNotKnownException,
-            UserNotAuthorizedException
-    {
+            UserNotAuthorizedException {
 
-        final String methodName                   = "reTypeRelationship";
-        final String relationshipParameterName    = "relationshipGUID";
-        final String currentTypeDefParameterName  = "currentTypeDefSummary";
-        final String newTypeDefParameterName      = "newTypeDefSummary";
+        final String methodName = "reTypeRelationship";
+        final String relationshipParameterName = "relationshipGUID";
+        final String currentTypeDefParameterName = "currentTypeDefSummary";
+        final String newTypeDefParameterName = "newTypeDefSummary";
 
         /*
          * Validate parameters
@@ -3259,7 +3045,7 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
         /*
          * Locate relationship
          */
-        Relationship  relationship  = this.getRelationship(userId, relationshipGUID);
+        Relationship relationship = this.getRelationship(userId, relationshipGUID);
 
         repositoryValidator.validateRelationshipCanBeUpdated(repositoryName, metadataCollectionId, relationship, methodName);
 
@@ -3281,8 +3067,8 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
         /*
          * Validation complete - ok to make changes
          */
-        Relationship   updatedRelationship = new Relationship(relationship);
-        InstanceType   newInstanceType = repositoryHelper.getNewInstanceType(repositoryName, newTypeDefSummary);
+        Relationship updatedRelationship = new Relationship(relationship);
+        InstanceType newInstanceType = repositoryHelper.getNewInstanceType(repositoryName, newTypeDefSummary);
 
         updatedRelationship.setType(newInstanceType);
 
@@ -3296,20 +3082,19 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
 
     // reHomeRelationship
     @Override
-    public Relationship reHomeRelationship(String   userId,
-                                           String   relationshipGUID,
-                                           String   typeDefGUID,
-                                           String   typeDefName,
-                                           String   homeMetadataCollectionId,
-                                           String   newHomeMetadataCollectionId,
-                                           String   newHomeMetadataCollectionName)
+    public Relationship reHomeRelationship(String userId,
+                                           String relationshipGUID,
+                                           String typeDefGUID,
+                                           String typeDefName,
+                                           String homeMetadataCollectionId,
+                                           String newHomeMetadataCollectionId,
+                                           String newHomeMetadataCollectionName)
             throws
             InvalidParameterException,
             RepositoryErrorException,
             RelationshipNotKnownException,
-            UserNotAuthorizedException
-    {
-        final String methodName                = "reHomeRelationship";
+            UserNotAuthorizedException {
+        final String methodName = "reHomeRelationship";
         final String relationshipParameterName = "relationshipGUID";
 
         /*
@@ -3327,14 +3112,14 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
         /*
          * Locate relationship
          */
-        Relationship  relationship  = this.getRelationship(userId, relationshipGUID);
+        Relationship relationship = this.getRelationship(userId, relationshipGUID);
 
         repositoryValidator.validateRelationshipCanBeRehomed(repositoryName, metadataCollectionId, relationship, methodName);
 
         /*
          * Validation complete - ok to make changes
          */
-        Relationship   updatedRelationship = new Relationship(relationship);
+        Relationship updatedRelationship = new Relationship(relationship);
 
         updatedRelationship.setMetadataCollectionId(newHomeMetadataCollectionId);
         updatedRelationship.setMetadataCollectionName(newHomeMetadataCollectionName);
@@ -3348,22 +3133,20 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
     }
 
 
-
     // updateEntityClassification
     @Override
-    public EntityDetail updateEntityClassification(String               userId,
-                                                   String               entityGUID,
-                                                   String               classificationName,
-                                                   InstanceProperties   properties)
+    public EntityDetail updateEntityClassification(String userId,
+                                                   String entityGUID,
+                                                   String classificationName,
+                                                   InstanceProperties properties)
             throws
             InvalidParameterException,
             RepositoryErrorException,
             EntityNotKnownException,
             ClassificationErrorException,
             PropertyErrorException,
-            UserNotAuthorizedException
-    {
-        final String  methodName = "updateEntityClassification";
+            UserNotAuthorizedException {
+        final String methodName = "updateEntityClassification";
 
         /*
          * Validate parameters
@@ -3380,8 +3163,7 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
             repositoryValidator.validateEntityFromStore(repositoryName, entityGUID, entity, methodName);
             repositoryValidator.validateEntityIsNotDeleted(repositoryName, entity, methodName);
 
-        }
-        catch (EntityProxyOnlyException e) {
+        } catch (EntityProxyOnlyException e) {
             log.warn("{} entity wth GUID {} only a proxy", methodName, entityGUID);
 
             throw new EntityNotKnownException(OMRSErrorCode.ENTITY_NOT_KNOWN.getMessageDefinition(entityGUID, methodName, repositoryName),
@@ -3396,7 +3178,7 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
                 classificationName,
                 methodName);
 
-        Classification  newClassification = new Classification(classification);
+        Classification newClassification = new Classification(classification);
 
         newClassification.setProperties(properties);
 
@@ -3420,8 +3202,8 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
      */
 
     @Override
-    public void saveEntityReferenceCopy(String         userId,
-                                        EntityDetail   entity)
+    public void saveEntityReferenceCopy(String userId,
+                                        EntityDetail entity)
             throws
             InvalidParameterException,
             RepositoryErrorException,
@@ -3430,10 +3212,9 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
             HomeEntityException,
             EntityConflictException,
             InvalidEntityException,
-            UserNotAuthorizedException
-    {
-        final String  methodName            = "saveEntityReferenceCopy";
-        final String  instanceParameterName = "entity";
+            UserNotAuthorizedException {
+        final String methodName = "saveEntityReferenceCopy";
+        final String instanceParameterName = "entity";
 
         /*
          * Validate parameters
@@ -3455,9 +3236,8 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
             RepositoryErrorException,
             EntityNotKnownException,
             UserNotAuthorizedException,
-            FunctionNotSupportedException
-    {
-        final String  methodName = "getHomeClassifications";
+            FunctionNotSupportedException {
+        final String methodName = "getHomeClassifications";
 
         this.validateRepositoryConnector(methodName);
         parentConnector.validateRepositoryIsActive(methodName);
@@ -3465,8 +3245,7 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
         EntityDetail retrievedEntity = null;
         try {
             retrievedEntity = graphStore.getEntityDetailFromStore(entityGUID);
-        }
-        catch (EntityProxyOnlyException | EntityNotKnownException e) {
+        } catch (EntityProxyOnlyException | EntityNotKnownException e) {
             log.debug("{} entity wth GUID {} not known or only a proxy", methodName, entityGUID);
         }
 
@@ -3502,21 +3281,20 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
      * ref copy - so when we now purge the ref copy there is no need to remove any proxy - it has already been subsumed.
      */
     @Override
-    public void purgeEntityReferenceCopy(String   userId,
-                                         String   entityGUID,
-                                         String   typeDefGUID,
-                                         String   typeDefName,
-                                         String   homeMetadataCollectionId)
+    public void purgeEntityReferenceCopy(String userId,
+                                         String entityGUID,
+                                         String typeDefGUID,
+                                         String typeDefName,
+                                         String homeMetadataCollectionId)
             throws
             InvalidParameterException,
             RepositoryErrorException,
             EntityNotKnownException,
             HomeEntityException,
-            UserNotAuthorizedException
-    {
-        final String methodName                = "purgeEntityReferenceCopy";
-        final String entityParameterName       = "entityGUID";
-        final String homeParameterName         = "homeMetadataCollectionId";
+            UserNotAuthorizedException {
+        final String methodName = "purgeEntityReferenceCopy";
+        final String entityParameterName = "entityGUID";
+        final String homeParameterName = "homeMetadataCollectionId";
 
         /*
          * Validate parameters
@@ -3533,8 +3311,7 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
         EntityDetail entity = null;
         try {
             entity = graphStore.getEntityDetailFromStore(entityGUID);
-        }
-        catch (EntityProxyOnlyException e) {
+        } catch (EntityProxyOnlyException e) {
             log.warn("{} entity wth GUID {} only a proxy", methodName, entityGUID);
 
             throw new EntityNotKnownException(OMRSErrorCode.ENTITY_NOT_KNOWN.getMessageDefinition(entityGUID, methodName, repositoryName),
@@ -3543,20 +3320,17 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
                     e);
         }
 
-        if (entity != null)
-        {
+        if (entity != null) {
             graphStore.removeEntityFromStore(entityGUID);
-        }
-        else
-        {
+        } else {
             super.reportEntityNotKnown(entityGUID, methodName);
         }
     }
 
 
     @Override
-    public void saveClassificationReferenceCopy(String         userId,
-                                                EntityDetail   entity,
+    public void saveClassificationReferenceCopy(String userId,
+                                                EntityDetail entity,
                                                 Classification classification)
             throws InvalidParameterException,
             RepositoryErrorException,
@@ -3565,11 +3339,10 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
             InvalidEntityException,
             PropertyErrorException,
             UserNotAuthorizedException,
-            FunctionNotSupportedException
-    {
-        final String  methodName = "saveClassificationReferenceCopy";
-        final String  classificationParameterName = "classification";
-        final String  propertiesParameterName = "classification.getProperties()";
+            FunctionNotSupportedException {
+        final String methodName = "saveClassificationReferenceCopy";
+        final String classificationParameterName = "classification";
+        final String propertiesParameterName = "classification.getProperties()";
 
         this.validateRepositoryConnector(methodName);
         parentConnector.validateRepositoryIsActive(methodName);
@@ -3577,8 +3350,7 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
         EntityDetail retrievedEntity = null;
         try {
             retrievedEntity = graphStore.getEntityDetailFromStore(entity.getGUID());
-        }
-        catch (EntityProxyOnlyException | EntityNotKnownException e) {
+        } catch (EntityProxyOnlyException | EntityNotKnownException e) {
             log.debug("{} entity wth GUID {} not known or only a proxy", methodName, entity.getGUID());
         }
 
@@ -3622,26 +3394,22 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
                 if (metadataCollectionId.equals(entity.getMetadataCollectionId())) {
                     updatedEntity = repositoryHelper.incrementVersion(userId, retrievedEntity, updatedEntity);
                     graphStore.updateEntityInStore(updatedEntity);
-                }
-                else {
+                } else {
                     graphStore.saveEntityReferenceCopyToStore(entity);
                 }
-            }
-            catch (EntityNotKnownException  error) {
+            } catch (EntityNotKnownException error) {
                 // Ignore since the entity has been removed since the classification was added
-            }
-            catch (ClassificationErrorException error) {
+            } catch (ClassificationErrorException error) {
                 throw new TypeErrorException(error);
             }
         }
     }
 
 
-
     @Override
-    public  void purgeClassificationReferenceCopy(String         userId,
-                                                  EntityDetail   entity,
-                                                  Classification classification)
+    public void purgeClassificationReferenceCopy(String userId,
+                                                 EntityDetail entity,
+                                                 Classification classification)
             throws InvalidParameterException,
             TypeErrorException,
             PropertyErrorException,
@@ -3649,8 +3417,7 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
             InvalidEntityException,
             RepositoryErrorException,
             UserNotAuthorizedException,
-            FunctionNotSupportedException
-    {
+            FunctionNotSupportedException {
         final String methodName = "purgeClassificationReferenceCopy";
 
         this.validateRepositoryConnector(methodName);
@@ -3659,8 +3426,7 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
         EntityDetail retrievedEntity = null;
         try {
             retrievedEntity = graphStore.getEntityDetailFromStore(entity.getGUID());
-        }
-        catch (EntityProxyOnlyException | EntityNotKnownException e) {
+        } catch (EntityProxyOnlyException | EntityNotKnownException e) {
             log.debug("{} entity wth GUID {} not known or only a proxy", methodName, entity.getGUID());
         }
 
@@ -3681,22 +3447,19 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
                 if (metadataCollectionId.equals(entity.getMetadataCollectionId())) {
                     updatedEntity = repositoryHelper.incrementVersion(userId, retrievedEntity, updatedEntity);
                     graphStore.updateEntityInStore(updatedEntity);
-                }
-                else {
+                } else {
                     graphStore.saveEntityReferenceCopyToStore(entity);
                 }
-            }
-            catch (ClassificationErrorException error) {
+            } catch (ClassificationErrorException error) {
                 throw new TypeErrorException(error);
             }
         }
     }
 
 
-
     @Override
-    public void saveRelationshipReferenceCopy(String         userId,
-                                              Relationship   relationship)
+    public void saveRelationshipReferenceCopy(String userId,
+                                              Relationship relationship)
             throws
             InvalidParameterException,
             RepositoryErrorException,
@@ -3706,10 +3469,9 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
             HomeRelationshipException,
             RelationshipConflictException,
             InvalidRelationshipException,
-            UserNotAuthorizedException
-    {
-        final String  methodName            = "saveRelationshipReferenceCopy";
-        final String  instanceParameterName = "relationship";
+            UserNotAuthorizedException {
+        final String methodName = "saveRelationshipReferenceCopy";
+        final String instanceParameterName = "relationship";
 
         /*
          * Validate parameters
@@ -3725,21 +3487,20 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
 
 
     @Override
-    public void purgeRelationshipReferenceCopy(String   userId,
-                                               String   relationshipGUID,
-                                               String   typeDefGUID,
-                                               String   typeDefName,
-                                               String   homeMetadataCollectionId)
+    public void purgeRelationshipReferenceCopy(String userId,
+                                               String relationshipGUID,
+                                               String typeDefGUID,
+                                               String typeDefName,
+                                               String homeMetadataCollectionId)
             throws
             InvalidParameterException,
             RepositoryErrorException,
             RelationshipNotKnownException,
             HomeRelationshipException,
-            UserNotAuthorizedException
-    {
-        final String methodName                = "purgeRelationshipReferenceCopy";
+            UserNotAuthorizedException {
+        final String methodName = "purgeRelationshipReferenceCopy";
         final String relationshipParameterName = "relationshipGUID";
-        final String homeParameterName         = "homeMetadataCollectionId";
+        final String homeParameterName = "homeMetadataCollectionId";
 
 
         /*
@@ -3763,14 +3524,14 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
 
     // getEntityNeighborhood
     @Override
-    public InstanceGraph getEntityNeighborhood(String               userId,
-                                               String               entityGUID,
-                                               List<String>         entityTypeGUIDs,
-                                               List<String>         relationshipTypeGUIDs,
+    public InstanceGraph getEntityNeighborhood(String userId,
+                                               String entityGUID,
+                                               List<String> entityTypeGUIDs,
+                                               List<String> relationshipTypeGUIDs,
                                                List<InstanceStatus> limitResultsByStatus,
-                                               List<String>         limitResultsByClassification,
-                                               Date                 asOfTime,
-                                               int                  level)
+                                               List<String> limitResultsByClassification,
+                                               Date asOfTime,
+                                               int level)
             throws
             InvalidParameterException,
             RepositoryErrorException,
@@ -3778,14 +3539,13 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
             TypeErrorException,
             PropertyErrorException,
             FunctionNotSupportedException,
-            UserNotAuthorizedException
-    {
-        final String methodName                                  = "getEntityNeighborhood";
-        final String entityGUIDParameterName                     = "entityGUID";
-        final String entityTypeGUIDParameterName                 = "entityTypeGUIDs";
-        final String relationshipTypeGUIDParameterName           = "relationshipTypeGUIDs";
+            UserNotAuthorizedException {
+        final String methodName = "getEntityNeighborhood";
+        final String entityGUIDParameterName = "entityGUID";
+        final String entityTypeGUIDParameterName = "entityTypeGUIDs";
+        final String relationshipTypeGUIDParameterName = "relationshipTypeGUIDs";
         final String limitedResultsByClassificationParameterName = "limitResultsByClassification";
-        final String asOfTimeParameter                           = "asOfTime";
+        final String asOfTimeParameter = "asOfTime";
 
         /*
          * Validate parameters
@@ -3797,26 +3557,20 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
         repositoryValidator.validateGUID(repositoryName, entityGUIDParameterName, entityGUID, methodName);
         repositoryValidator.validateAsOfTime(repositoryName, asOfTimeParameter, asOfTime, methodName);
 
-        if (entityTypeGUIDs != null)
-        {
-            for (String guid : entityTypeGUIDs)
-            {
+        if (entityTypeGUIDs != null) {
+            for (String guid : entityTypeGUIDs) {
                 this.validateTypeGUID(repositoryName, entityTypeGUIDParameterName, guid, methodName);
             }
         }
 
-        if (relationshipTypeGUIDs != null)
-        {
-            for (String guid : relationshipTypeGUIDs)
-            {
+        if (relationshipTypeGUIDs != null) {
+            for (String guid : relationshipTypeGUIDs) {
                 this.validateTypeGUID(repositoryName, relationshipTypeGUIDParameterName, guid, methodName);
             }
         }
 
-        if (limitResultsByClassification != null)
-        {
-            for (String classificationName : limitResultsByClassification)
-            {
+        if (limitResultsByClassification != null) {
+            for (String classificationName : limitResultsByClassification) {
                 repositoryValidator.validateClassificationName(repositoryName,
                         limitedResultsByClassificationParameterName,
                         classificationName,
@@ -3840,8 +3594,6 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
     }
 
 
-
-
     // Return the list of entities that are of the types listed in entityTypeGUIDs and are connected, either directly or
     // indirectly to the entity identified by startEntityGUID.
     //
@@ -3850,16 +3602,16 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
     //
 
     @Override
-    public  List<EntityDetail> getRelatedEntities(String               userId,
-                                                  String               startEntityGUID,
-                                                  List<String>         entityTypeGUIDs,
-                                                  int                  fromEntityElement,
-                                                  List<InstanceStatus> limitResultsByStatus,
-                                                  List<String>         limitResultsByClassification,
-                                                  Date                 asOfTime,
-                                                  String               sequencingProperty,
-                                                  SequencingOrder      sequencingOrder,
-                                                  int                  pageSize)
+    public List<EntityDetail> getRelatedEntities(String userId,
+                                                 String startEntityGUID,
+                                                 List<String> entityTypeGUIDs,
+                                                 int fromEntityElement,
+                                                 List<InstanceStatus> limitResultsByStatus,
+                                                 List<String> limitResultsByClassification,
+                                                 Date asOfTime,
+                                                 String sequencingProperty,
+                                                 SequencingOrder sequencingOrder,
+                                                 int pageSize)
             throws
             InvalidParameterException,
             TypeErrorException,
@@ -3868,9 +3620,8 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
             PropertyErrorException,
             PagingErrorException,
             FunctionNotSupportedException,
-            UserNotAuthorizedException
-    {
-        final String  methodName = "getRelatedEntities";
+            UserNotAuthorizedException {
+        final String methodName = "getRelatedEntities";
 
         /*
          * Validate parameters
@@ -3896,7 +3647,7 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
         /*
          * Perform operation
          */
-        InstanceGraph adjacentGraph = this.getEntityNeighborhood( userId, startEntityGUID, entityTypeGUIDs, null, limitResultsByStatus, limitResultsByClassification, null, -1);
+        InstanceGraph adjacentGraph = this.getEntityNeighborhood(userId, startEntityGUID, entityTypeGUIDs, null, limitResultsByStatus, limitResultsByClassification, null, -1);
 
         if (adjacentGraph != null) {
 
@@ -3913,19 +3664,18 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
 
     // Return all of the relationships and intermediate entities that connect the startEntity with the endEntity.
     @Override
-    public  InstanceGraph getLinkingEntities(String                    userId,
-                                             String                    startEntityGUID,
-                                             String                    endEntityGUID,
-                                             List<InstanceStatus>      limitResultsByStatus,
-                                             Date                      asOfTime)
+    public InstanceGraph getLinkingEntities(String userId,
+                                            String startEntityGUID,
+                                            String endEntityGUID,
+                                            List<InstanceStatus> limitResultsByStatus,
+                                            Date asOfTime)
             throws
             InvalidParameterException,
             RepositoryErrorException,
             EntityNotKnownException,
             PropertyErrorException,
             FunctionNotSupportedException,
-            UserNotAuthorizedException
-    {
+            UserNotAuthorizedException {
         final String methodName = "getLinkingEntities";
 
         /*
@@ -3963,8 +3713,7 @@ public class CruxOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
         try {
 
             return graphStore.getPaths(startEntityGUID, endEntityGUID, limitResultsByStatus, maxPaths, maxDepth);
-        }
-        catch (Exception e) {
+        } catch (Exception e) {
             throw new RepositoryErrorException(GraphOMRSErrorCode.CONNECTED_ENTITIES_FAILURE.getMessageDefinition(startEntityGUID,
                     endEntityGUID,
                     methodName,

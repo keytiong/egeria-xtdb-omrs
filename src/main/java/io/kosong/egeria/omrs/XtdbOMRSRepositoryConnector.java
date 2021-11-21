@@ -1,7 +1,6 @@
 package io.kosong.egeria.omrs;
 
-import crux.api.Crux;
-import crux.api.ICruxAPI;
+import xtdb.api.IXtdb;
 import org.odpi.openmetadata.frameworks.auditlog.messagesets.ExceptionMessageDefinition;
 import org.odpi.openmetadata.frameworks.connectors.ffdc.ConnectorCheckedException;
 import org.odpi.openmetadata.repositoryservices.connectors.stores.metadatacollectionstore.OMRSMetadataCollection;
@@ -17,15 +16,15 @@ import java.io.IOException;
  * The CruxOMRSRepositoryConnector is a connector to a local open metadata repository that uses a Crux bitemporal data
  * store for its persistence.
  */
-public class CruxOMRSRepositoryConnector extends OMRSRepositoryConnector
+public class XtdbOMRSRepositoryConnector extends OMRSRepositoryConnector
 {
 
-    private ICruxAPI cruxNode;
+    private IXtdb xtdbNode;
 
     /**
      * Default constructor used by the OCF Connector Provider.
      */
-    public CruxOMRSRepositoryConnector()
+    public XtdbOMRSRepositoryConnector()
     {
         /*
          * Nothing to do (yet !)
@@ -41,9 +40,9 @@ public class CruxOMRSRepositoryConnector extends OMRSRepositoryConnector
 
             if (metadataCollectionId != null) {
                 try {
-                    cruxNode = Crux.startNode(new File("data/crux-node.edn"));
-                    metadataCollection = new CruxOMRSMetadataCollection(this,
-                            repositoryName, repositoryHelper, repositoryValidator, metadataCollectionId, auditLog, cruxNode);
+                    xtdbNode = IXtdb.startNode(new File("data/crux-node.edn"));
+                    metadataCollection = new XtdbOMRSMetadataCollection(this,
+                            repositoryName, repositoryHelper, repositoryValidator, metadataCollectionId, auditLog, xtdbNode);
                 } catch (Throwable t) {
                     ExceptionMessageDefinition messageDefinition = OMRSErrorCode.UNEXPECTED_EXCEPTION.getMessageDefinition();
                     throw new RepositoryErrorException(messageDefinition, this.getClass().getName(), methodName, t);
@@ -65,9 +64,9 @@ public class CruxOMRSRepositoryConnector extends OMRSRepositoryConnector
     @Override
     public void disconnect() throws ConnectorCheckedException {
         String methodName = "disconnect";
-        if (cruxNode != null) {
+        if (xtdbNode != null) {
             try {
-                cruxNode.close();
+                xtdbNode.close();
                 metadataCollection = null;
                 super.disconnect();
             } catch (IOException e) {
@@ -78,7 +77,7 @@ public class CruxOMRSRepositoryConnector extends OMRSRepositoryConnector
         }
     }
 
-    public ICruxAPI getCruxNode() {
-        return cruxNode;
+    public IXtdb getXtdbNode() {
+        return xtdbNode;
     }
 }

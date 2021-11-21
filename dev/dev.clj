@@ -4,15 +4,15 @@
             [io.kosong.egeria.omrs :as omrs]
             [clojure.java.io :as io]
             [clojure.edn :as edn]
-            [crux.rocksdb]
-            [crux.api :as crux])
+            [xtdb.rocksdb]
+            [xtdb.api :as xtdb])
   (:import (org.odpi.openmetadata.repositoryservices.connectors.stores.metadatacollectionstore.properties.instances InstanceProperties PrimitivePropertyValue)
            (org.odpi.openmetadata.repositoryservices.connectors.stores.metadatacollectionstore.properties.typedefs PrimitiveDefCategory)
            (java.util Collections)
            (java.nio.file Path Paths)
            (java.net URI)))
 
-(import io.kosong.egeria.omrs.CruxOMRSRepositoryConnector)
+(import io.kosong.egeria.omrs.XtdbOMRSRepositoryConnector)
 
 (def metadata-collection-id "b2718e10-9aa0-4944-8849-e856959cbbaa")
 
@@ -74,32 +74,32 @@
 (defmethod ig/init-key ::repository-validator [_ config]
   (omrs/->repository-validator config))
 
-(defmethod ig/init-key ::crux-repository-connector [_ {:keys [metadata-collection-id
+(defmethod ig/init-key ::xtdb-repository-connector [_ {:keys [metadata-collection-id
                                                               repository-validator
                                                               repository-helper
                                                               audit-log]}]
-  (doto (CruxOMRSRepositoryConnector.)
+  (doto (XtdbOMRSRepositoryConnector.)
     (.setRepositoryHelper repository-helper)
     (.setRepositoryValidator repository-validator)
     (.setAuditLog audit-log)
     (.setMetadataCollectionId metadata-collection-id)
     (.start)))
 
-(defmethod ig/halt-key! ::crux-repository-connector [_ connector]
+(defmethod ig/halt-key! ::xtdb-repository-connector [_ connector]
   (.disconnect connector))
 
-(defmethod ig/init-key ::crux-node [_ crux-config]
-  (crux/start-node crux-config))
+(defmethod ig/init-key ::xtdb-node [_ xtdb-config]
+  (xtdb/start-node xtdb-config))
 
 (def db-dir (str "file://" (System/getProperty "user.dir") "/data/rocksdb"))
 
-(def crux-config
-  {::crux-node
-   {:my-rocksdb          {:crux/module crux.rocksdb/->kv-store
+(def xtdb-config
+  {::xtdb-node
+   {:my-rocksdb          {:xtdb/module xtdb.rocksdb/->kv-store
                           :db-dir      (Paths/get (URI. db-dir))}
-    :crux/index-store    {:kv-store :my-rocksdb}
-    :crux/tx-log         {:kv-store :my-rocksdb}
-    :crux/document-store {:kv-store :my-rocksdb}}})
+    :xtdb/index-store    {:kv-store :my-rocksdb}
+    :xtdb/tx-log         {:kv-store :my-rocksdb}
+    :xtdb/document-store {:kv-store :my-rocksdb}}})
 
 
 (def egeria-config
@@ -126,12 +126,12 @@
 
    ::repository-validator       {:content-manager (ig/ref ::repository-content-manager)}
 
-   ::crux-repository-connector  {:metadata-collection-id "b2718e10-9aa0-4944-8849-e856959cbbaa"
+   ::xtdb-repository-connector  {:metadata-collection-id "b2718e10-9aa0-4944-8849-e856959cbbaa"
                                  :repository-helper      (ig/ref ::repository-helper)
                                  :repository-validator   (ig/ref ::repository-validator)
                                  :audit-log              (ig/ref ::audit-log)}})
 
-(integrant.repl/set-prep! (constantly crux-config))
+(integrant.repl/set-prep! (constantly xtdb-config))
 
 (defn dataset-instance []
   (let [instance-props (doto (InstanceProperties.)
@@ -175,12 +175,12 @@
       instance-props
       Collections/EMPTY_LIST)))
 
-(defn crux-node []
-  (::crux-node integrant.repl.state/system))
+(defn xtdb-node []
+  (::xtdb-node integrant.repl.state/system))
 
 (defn metadata-collection []
   (some->
-    (::crux-repository-connector integrant.repl.state/system)
+    (::xtdb-repository-connector integrant.repl.state/system)
     (.getMetadataCollection)))
 
 

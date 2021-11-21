@@ -11,7 +11,7 @@
         <dependencySet>
             <outputDirectory>lib</outputDirectory>
             <includes>
-                <include>juxt:crux-rocksdb:jar:21.02-1.15.0-beta</include>
+                <include>com.xtdb:xtdb-rocksdb:jar:1.19.0</include>
             </includes>
             <excludes>
                 <exclude>commons-lang:commons-lang</exclude>
@@ -21,9 +21,9 @@
         </dependencySet>
         <dependencySet>
         <dependency>
-            <groupId>juxt</groupId>
-            <artifactId>crux-rocksdb</artifactId>
-            <version>21.02-1.15.0-beta</version>
+            <groupId>com.xtdb</groupId>
+            <artifactId>xtdb-rocksdb</artifactId>
+            <version>1.19.0</version>
         </dependency>
         </dependencySet>
     </dependencySets>
