@@ -3,7 +3,7 @@
 This is a quick guide on how to setup and run Egeria Open Metadata
 Conformance Suite
 
-## Build Crux OMRS
+## Build XTDB OMRS
 ```shell
 lein clean
 lein install
@@ -23,7 +23,7 @@ java \
  -Dloader.path=assembly/target \
  -Dserver.ssl.trustStore=$EGERIA_HOME/truststore.p12 \
  -jar \
- $EGERIA_HOME/server/server-chassis-spring-2.8-SNAPSHOT.jar
+ $EGERIA_HOME/server/server-chassis-spring-3.3.jar
 ```
 
 ## Start Clojure REPL

@@ -13,7 +13,7 @@ import java.io.File;
 import java.io.IOException;
 
 /**
- * The CruxOMRSRepositoryConnector is a connector to a local open metadata repository that uses a Crux bitemporal data
+ * The XtdbOMRSRepositoryConnector is a connector to a local open metadata repository that uses a Xtdb bitemporal data
  * store for its persistence.
  */
 public class XtdbOMRSRepositoryConnector extends OMRSRepositoryConnector

@@ -8,19 +8,19 @@ import org.odpi.openmetadata.repositoryservices.connectors.stores.metadatacollec
 
 /**
  * In the Open Connector Framework (OCF), a ConnectorProvider is a factory for a specific type of connector.
- * The CruxOMRSRepositoryConnectorProvider is the connector provider for the InMemoryOMRSRepositoryConnector.
+ * The XtdbOMRSRepositoryConnectorProvider is the connector provider for the InMemoryOMRSRepositoryConnector.
  * It extends OMRSRepositoryConnectorProviderBase which in turn extends the OCF ConnectorProviderBase.
  * ConnectorProviderBase supports the creation of connector instances.
  *
- * The CruxOMRSRepositoryConnectorProvider must initialize ConnectorProviderBase with the Java class
+ * The XtdbOMRSRepositoryConnectorProvider must initialize ConnectorProviderBase with the Java class
  * name of the OMRS Connector implementation (by calling super.setConnectorClassName(className)).
  * Then the connector provider will work.
  */
 public class XtdbOMRSRepositoryConnectorProvider extends OMRSRepositoryConnectorProviderBase
 {
     static final String  connectorTypeGUID = "8c1e2220-a0c7-4344-9e60-f071c40a23ea";
-    static final String  connectorTypeName = "OMRS Crux Repository Connector";
-    static final String  connectorTypeDescription = "OMRS Repository Connector that uses a Crux bitemporal data store.";
+    static final String  connectorTypeName = "OMRS Xtdb Repository Connector";
+    static final String  connectorTypeDescription = "OMRS Repository Connector that uses a Xtdb bitemporal data store.";
 
 
     /**

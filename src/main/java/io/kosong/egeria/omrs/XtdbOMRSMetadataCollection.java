@@ -44,7 +44,7 @@ import java.util.Map;
  */
 
 /**
- * The CruxOMRSMetadataCollection provides a local open metadata repository that uses Juxt Crux as its
+ * The XtdbOMRSMetadataCollection provides a local open metadata repository that uses Juxt Xtdb as its
  * persistence layer.
  */
 public class XtdbOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectionBase {
@@ -76,7 +76,7 @@ public class XtdbOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
          */
         super(parentConnector, repositoryName, repositoryHelper, repositoryValidator, metadataCollectionId);
 
-        final String methodName = "CruxOMRSMetadataCollection";
+        final String methodName = "XtdbOMRSMetadataCollection";
         /*
          * Save parentConnector since this has the connection information and access to the metadata about the
          * metadata cluster.
@@ -84,7 +84,7 @@ public class XtdbOMRSMetadataCollection extends OMRSDynamicTypeMetadataCollectio
         this.parentConnector = parentConnector;
 
         try {
-            Class<?> clazz = Class.forName("io.kosong.egeria.omrs.CruxOMRSMetadataStore");
+            Class<?> clazz = Class.forName("io.kosong.egeria.omrs.XtdbOMRSMetadataStore");
             Constructor ctor = clazz.getDeclaredConstructor(String.class, String.class, OMRSRepositoryHelper.class, IXtdb.class);
             this.graphStore = (GraphOMRSMetadataStore) ctor.newInstance(repositoryName, metadataCollectionId, repositoryHelper, xtdbNode);
         } catch (Throwable t) {

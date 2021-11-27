@@ -1,5 +1,5 @@
 (defproject io.kosong.egeria/egeria-xtdb-omrs "0.1.0-SNAPSHOT"
-  :description "Egeria open metadata repository implemented in Crux"
+  :description "Egeria open metadata repository implemented in XTDB"
   :url "https://github.com/keytiong/egeria-xtdb-orms"
   :license {:name "The MIT License"
             :url  "http://opensource.org/licenses/MIT"}
