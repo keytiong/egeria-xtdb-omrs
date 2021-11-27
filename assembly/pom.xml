@@ -3,6 +3,7 @@
   <groupId>io.kosong.egeria</groupId>
   <artifactId>egeria-xtdb-orms-assembly</artifactId>
   <version>0.1.0-SNAPSHOT</version>
+  <packaging>pom</packaging>
 
   <dependencies>
     <dependency>
@@ -18,12 +19,16 @@
     </dependency>
   </dependencies>
   <build>
+    <finalName>egeria-xtdb-orms-assembly-${version}</finalName>
     <plugins>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-assembly-plugin</artifactId>
         <version>3.3.0</version>
         <configuration>
+          <descriptors>
+            <descriptor>src/assembly/dist.xml</descriptor>
+          </descriptors>
           <descriptorRefs>
             <descriptorRef>jar-with-dependencies</descriptorRef>
           </descriptorRefs>

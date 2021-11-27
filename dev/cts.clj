@@ -24,8 +24,8 @@
                  :event-bus                     (ig/ref ::event-bus)
                  :cohort                        "devCohort"
                  :metadata-collection-name      "SUT_MDR"
-                 ;;:metadata-repository-type "in-memory-repository"
-                 :metadata-repository-connector {:connector-provider    "io.kosong.egeria.omrs.CruxOMRSRepositoryConnectorProvider"
+                 :metadata-repository-type      "repository-proxy"
+                 :metadata-repository-connector {:connector-provider    "io.kosong.egeria.omrs.XtdbOMRSRepositoryConnectorProvider"
                                                  :additional-properties {}}
                  }
 
@@ -197,12 +197,12 @@
      :root-url        root-url}))
 
 (defn start-omag-platform [{:keys [egeria-home version server-port admin-user-id]}]
-  (let [server-jar-path                             (str egeria-home "/server/server-chassis-spring-" version ".jar")
-        jvm-opts                                    (str "-Dserver.port=" server-port)
-        process-builder                             (doto (ProcessBuilder. ["/usr/bin/java" jvm-opts "-jar" server-jar-path])
-                                                      (.directory (io/file egeria-home)))
-        platform-process #_(.start process-builder) nil
-        platform-url                                (str "https://localhost:" server-port)]
+  (let [server-jar-path  (str egeria-home "/server/server-chassis-spring-" version ".jar")
+        jvm-opts         (str "-Dserver.port=" server-port)
+        process-builder  (doto (ProcessBuilder. ["/usr/bin/java" jvm-opts "-jar" server-jar-path])
+                           (.directory (io/file egeria-home)))
+        platform-process (.start process-builder)
+        platform-url     (str "https://localhost:" server-port)]
     (Thread/sleep 15000)
     {:platform-process platform-process
      :platform-url     platform-url

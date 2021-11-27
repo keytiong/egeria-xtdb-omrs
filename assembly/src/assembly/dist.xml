@@ -3,28 +3,33 @@
           xsi:schemaLocation="http://maven.apache.org/ASSEMBLY/2.1.0 http://maven.apache.org/xsd/assembly-2.1.0.xsd">
     <id>dist</id>
     <formats>
+        <format>tar.gz</format>
         <format>zip</format>
         <format>dir</format>
     </formats>
 
+    <baseDirectory>egeria-xtdb-omrs-${version}</baseDirectory>
     <dependencySets>
         <dependencySet>
             <outputDirectory>lib</outputDirectory>
+            <!--
             <includes>
                 <include>com.xtdb:xtdb-rocksdb:jar:1.19.0</include>
             </includes>
+            -->
+            <!--
+            [org.odpi.egeria/open-metadata-types "3.3"]
+                 [org.odpi.egeria/repository-services-apis "3.3"]
+                 [org.odpi.egeria/repository-services-implementation "3.3" :exclusions
+                  [org.odpi.egeria/graph-repository-connector
+                   org.odpi.egeria/inmemory-repository-connector]]
+            -->
             <excludes>
-                <exclude>commons-lang:commons-lang</exclude>
-                <exclude>log4j:log4j</exclude>
-                <exclude>ch.qos.logback:logback-classic</exclude>
+                <exclude>org.odpi.egeria:*</exclude>
             </excludes>
-        </dependencySet>
-        <dependencySet>
-        <dependency>
-            <groupId>com.xtdb</groupId>
-            <artifactId>xtdb-rocksdb</artifactId>
-            <version>1.19.0</version>
-        </dependency>
+            <useProjectArtifact>false</useProjectArtifact>
+            <useTransitiveDependencies>true</useTransitiveDependencies>
+            <useTransitiveFiltering>true</useTransitiveFiltering>
         </dependencySet>
     </dependencySets>
 </assembly>
