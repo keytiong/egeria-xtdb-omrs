@@ -10,9 +10,8 @@
            (java.util List UUID Map Collections)
            (xtdb.api IXtdb)
            (org.odpi.openmetadata.repositoryservices.connectors.stores.metadatacollectionstore.repositoryconnector OMRSRepositoryHelper)
-           (org.odpi.openmetadata.repositoryservices.ffdc.exception EntityNotDeletedException EntityNotKnownException EntityProxyOnlyException)
-           (io.kosong.egeria.omrs GraphOMRSErrorCode)))
-
+           (io.kosong.egeria.omrs GraphOMRSErrorCode)
+           (org.odpi.openmetadata.repositoryservices.ffdc.exception EntityProxyOnlyException)))
 
 (gen-class
   :name io.kosong.egeria.omrs.XtdbOMRSMetadataStore
@@ -24,7 +23,6 @@
                   org.odpi.openmetadata.repositoryservices.connectors.stores.metadatacollectionstore.repositoryconnector.OMRSRepositoryHelper
                   xtdb.api.IXtdb]
                  []})
-
 
 (defn- find-instance [db key-attribute value]
   (let [?e (gensym "?e_")
@@ -46,21 +44,19 @@
     (map first (xt/q db q entity-guid))))
 
 
-(defn- ensure-crux-db-id [document]
+(defn- ensure-xtdb-db-id [document]
   (if (:xt/id document)
     document
     (assoc document :xt/id (str (UUID/randomUUID)))))
 
-
 (defn- save-single-document-tx-ops [document]
-  (let [document (-> (ensure-crux-db-id document)
+  (let [document (-> (ensure-xtdb-db-id document)
                    (into (sorted-map-by compare)))]
     [[::xt/put document]]))
 
-
 (defn- save-entity-tx-ops [entity-detail]
   (let [cls-docs   (->> (:openmetadata.Entity/classifications entity-detail)
-                     (map ensure-crux-db-id))
+                     (map ensure-xtdb-db-id))
         cls-ids    (mapv :xt/id cls-docs)
         entity-doc (assoc entity-detail :openmetadata.Entity/classifications cls-ids)]
     (->> (map save-single-document-tx-ops cls-docs)
@@ -77,25 +73,22 @@
         type-def-doc  (omrs/->map typeDef)
         type-def-guid (:openmetadata.TypeDef/guid type-def-doc)
         type-def-name (:openmetadata.TypeDef/name type-def-doc)
-        crux-node     (:crux-node @state)
-        db            (xt/db crux-node)
+        xtdb-node     (:xtdb-node @state)
+        db            (xt/db xtdb-node)
         existing      (or
                         (find-instance db :openmetadata.TypeDef/guid type-def-guid)
                         (find-instance db :openmetadata.TypeDef/name type-def-name))]
     (when-not existing
       (let [tx-ops (save-single-document-tx-ops type-def-doc)]
-        (xt/submit-tx crux-node tx-ops)))))
-
+        (xt/submit-tx xtdb-node tx-ops)))))
 
 (defn- unique-type-def-attributes [repo-helper type-def]
   (->> (omrs/list-type-def-attributes repo-helper type-def)
     (filter :openmetadata.TypeDefAttribute/isUnique)))
 
-
 (defn- match-single-query [[a v]]
   {:find  '[?e]
    :where [['?e a v]]})
-
 
 (defn- match-any-query [avs]
   (let [triples (map (fn [[a v]] ['?e a v]) avs)]
@@ -109,7 +102,7 @@
      :where `[~@triples]}))
 
 
-(defn- entity-exist? [crux-node repo-helper entity-doc]
+(defn- entity-exist? [xtdb-node repo-helper entity-doc]
   (let [type-def-guid    (:openmetadata.Entity/typeDefGUID entity-doc)
         type-def         (omrs/find-type-def-by-guid repo-helper type-def-guid)
         unique-attrs     (unique-type-def-attributes repo-helper type-def)
@@ -117,7 +110,7 @@
                            :openmetadata.Entity/guid)
         criteria         (select-keys entity-doc unique-prop-keys)
         query            (match-any-query criteria)
-        db               (xt/db crux-node)]
+        db               (xt/db xtdb-node)]
     (not-empty (xt/q db query))))
 
 
@@ -126,7 +119,7 @@
     (not= (:openmetadata.Entity/metadataCollectionId entity) local-metadata-collection-id)))
 
 
-(defn- verify-unique-constraints [crux-node repo-helper new-entity]
+(defn- verify-unique-constraints [xtdb-node repo-helper new-entity]
   (let [entity-guid      (:openmetadata.Entity/guid new-entity)
         type-def-guid    (:openmetadata.Entity/typeDefGUID new-entity)
         type-def         (omrs/find-type-def-by-guid repo-helper type-def-guid)
@@ -137,7 +130,7 @@
                            `{:find  [~'?guid]
                              :where [[~'?e :openmetadata.Entity/guid ~'?guid]
                                      (~'or ~@triples)]})
-        db               (xt/db crux-node)
+        db               (xt/db xtdb-node)
         guids            (->> (xt/q db query)
                            (map first)
                            (into #{}))
@@ -152,17 +145,17 @@
     (map first (xt/q db query))))
 
 
-(defn- verify-entity-proxy-one [crux-node repo-helper new-relationship]
+(defn- verify-entity-proxy-one [xtdb-node repo-helper new-relationship]
   (let [entity-guid (:openmetadata.Relationship/entityOne new-relationship)
-        db          (xt/db crux-node)
+        db          (xt/db xtdb-node)
         entity      (fetch-instance db [:openmetadata.Entity/guid entity-guid])]
     (if-not entity
       (throw (ex-info "Entity one not found." {:relationship new-relationship})))))
 
 
-(defn- verify-entity-proxy-two [crux-node repo-helper new-relationship]
+(defn- verify-entity-proxy-two [xtdb-node repo-helper new-relationship]
   (let [entity-guid (:openmetadata.Relationship/entityOne new-relationship)
-        db          (xt/db crux-node)
+        db          (xt/db xtdb-node)
         entity      (fetch-instance db [:openmetadata.Entity/guid entity-guid])]
     (if-not entity
       (throw (ex-info "Entity two not found." {:relationship new-relationship})))))
@@ -244,7 +237,7 @@
         repository-name (:repository-name state)
         db              (xt/db xtdb-node)
         entity          (find-entity-instance db guid)
-        class-name      "crux-metadata-store"
+        class-name      "xtdb-metadata-store"
         method-name     "getEntityDetailFromStore"]
     (when-not entity
       (let [msg-args (into-array String [guid class-name method-name repository-name])
@@ -339,7 +332,7 @@
         stored-classifications-name-id-map (zipmap
                                              (map :openmetadata.Classification/name stored-classifications)
                                              (map :xt/id stored-classifications))
-        ensure-classification-crux-id      (fn [c]
+        ensure-classification-xtdb-id      (fn [c]
                                              (let [classification-name      (:openmetadata.Classification/name c)
                                                    classification-id        (:xt/id c)
                                                    stored-classification-id (get stored-classifications-name-id-map classification-name)]
@@ -348,16 +341,16 @@
                                                  stored-classification-id (assoc c :xt/id stored-classification-id)
                                                  :default (assoc c :xt/id (UUID/randomUUID)))))
         new-classifications                (->> (:openmetadata.Entity/classifications new-entity)
-                                             (map ensure-classification-crux-id))
-        stored-classification-crux-ids     (map :xt/id stored-classifications)
-        new-classification-crux-ids        (map :xt/id new-classifications)
-        deleted-classification-crux-ids    (-> (clojure.data/diff stored-classification-crux-ids new-classification-crux-ids)
+                                             (map ensure-classification-xtdb-id))
+        stored-classification-xtdb-ids     (map :xt/id stored-classifications)
+        new-classification-xtdb-ids        (map :xt/id new-classifications)
+        deleted-classification-xtdb-ids    (-> (clojure.data/diff stored-classification-xtdb-ids new-classification-xtdb-ids)
                                              (first))
-        delete-classification-tx-ops       (reduce conj [] (map (fn [x] [::xt/delete x]) deleted-classification-crux-ids))
+        delete-classification-tx-ops       (reduce conj [] (map (fn [x] [::xt/delete x]) deleted-classification-xtdb-ids))
         put-classification-tx-ops          (reduce conj [] (map (fn [x] [::xt/put x]) new-classifications))
         new-entity                         (-> new-entity
                                              (assoc :xt/id (:xt/id stored-entity))
-                                             (assoc :openmetadata.Entity/classifications new-classification-crux-ids))
+                                             (assoc :openmetadata.Entity/classifications new-classification-xtdb-ids))
         put-entity-tx-op                   [::xt/put new-entity]
         tx-ops                             (conj
                                              (reduce conj (vec delete-classification-tx-ops) put-classification-tx-ops)
@@ -394,8 +387,8 @@
         xtdb-node                    (:xtdb-node state)
         db                           (xt/db xtdb-node)
         stored-entity                (first (fetch-instance db [:openmetadata.Entity/guid guid]))
-        classification-crux-ids      (:openmetadata.Entity/classifications stored-entity)
-        delete-classification-tx-ops (reduce conj [] (map (fn [x] [::xt/delete x]) classification-crux-ids))
+        classification-xtdb-ids      (:openmetadata.Entity/classifications stored-entity)
+        delete-classification-tx-ops (reduce conj [] (map (fn [x] [::xt/delete x]) classification-xtdb-ids))
         delete-entity-tx-op          [::xt/delete (:xt/id stored-entity)]
         tx-ops                       (conj delete-classification-tx-ops delete-entity-tx-op)]
     (xt/submit-tx xtdb-node tx-ops)))
