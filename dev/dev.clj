@@ -1,4 +1,5 @@
 (ns dev
+  (:refer-clojure)
   (:require [integrant.repl :refer [clear go halt prep init reset reset-all]]
             [integrant.core :as ig]
             [io.kosong.egeria.omrs :as omrs]
@@ -131,7 +132,7 @@
                                  :repository-validator   (ig/ref ::repository-validator)
                                  :audit-log              (ig/ref ::audit-log)}})
 
-(integrant.repl/set-prep! (constantly xtdb-config))
+(integrant.repl/set-prep! (constantly egeria-config))
 
 (defn dataset-instance []
   (let [instance-props (doto (InstanceProperties.)
@@ -167,7 +168,7 @@
                                                           (.setPrimitiveDefCategory PrimitiveDefCategory/OM_PRIMITIVE_TYPE_CHAR)
                                                           (.setPrimitiveValue \")))
                          )]
-    (omrs/->EntityDetail *repo-helper*
+    (omrs/->EntityDetail
       "repl"
       metadata-collection-id
       "alice"

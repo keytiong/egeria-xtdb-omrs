@@ -1,78 +1,96 @@
 (ns io.kosong.egeria.omrs
-  (:require [clojure.string :as str])
-  (:import
-    (java.util Collections LinkedList UUID)
-    (org.odpi.openmetadata.repositoryservices.localrepository.repositorycontentmanager OMRSRepositoryContentHelper OMRSRepositoryContentManager OMRSRepositoryContentValidator)
-    (org.odpi.openmetadata.repositoryservices.connectors.stores.metadatacollectionstore.properties.instances InstanceProvenanceType InstanceProperties PrimitivePropertyValue MapPropertyValue EnumPropertyValue ArrayPropertyValue EntityDetail InstanceType InstanceStatus EntityProxy Classification ClassificationOrigin Relationship EntitySummary)
-    (org.odpi.openmetadata.repositoryservices.connectors.stores.metadatacollectionstore.properties.typedefs PrimitiveDef PrimitiveDefCategory CollectionDefCategory CollectionDef EnumElementDef ClassificationDef AttributeTypeDef TypeDef TypeDefAttribute EntityDef RelationshipDef EnumDef ExternalStandardMapping TypeDefAttribute EnumElementDef TypeDefPatch TypeDefCategory)
-    (org.odpi.openmetadata.opentypes OpenMetadataTypesArchive)
-    (org.odpi.openmetadata.repositoryservices.connectors.stores.auditlogstore OMRSAuditLogRecord OMRSAuditLogStore)
-    (org.odpi.openmetadata.repositoryservices.auditlog OMRSAuditLogDestination OMRSAuditLog)
-    (org.odpi.openmetadata.repositoryservices.connectors.stores.archivestore.properties OpenMetadataArchiveTypeStore OpenMetadataArchive)
-    (org.odpi.openmetadata.repositoryservices.connectors.stores.metadatacollectionstore.utilities OMRSRepositoryPropertiesUtilities)))
+  (:require [clojure.string :as str]
+            [clojure.core.protocols :as p]
+            [clojure.datafy :refer [datafy]])
+  (:import (java.util Collections LinkedList UUID)
+           (org.odpi.openmetadata.repositoryservices.localrepository.repositorycontentmanager OMRSRepositoryContentHelper OMRSRepositoryContentManager OMRSRepositoryContentValidator)
+           (org.odpi.openmetadata.repositoryservices.connectors.stores.metadatacollectionstore.properties.instances InstanceProvenanceType InstanceProperties PrimitivePropertyValue MapPropertyValue EnumPropertyValue ArrayPropertyValue EntityDetail InstanceType InstanceStatus EntityProxy Classification ClassificationOrigin Relationship EntitySummary)
+           (org.odpi.openmetadata.repositoryservices.connectors.stores.metadatacollectionstore.properties.typedefs PrimitiveDef PrimitiveDefCategory CollectionDefCategory CollectionDef EnumElementDef ClassificationDef AttributeTypeDef TypeDef TypeDefAttribute EntityDef RelationshipDef EnumDef ExternalStandardMapping TypeDefAttribute EnumElementDef TypeDefPatch TypeDefCategory)
+           (org.odpi.openmetadata.opentypes OpenMetadataTypesArchive)
+           (org.odpi.openmetadata.repositoryservices.connectors.stores.auditlogstore OMRSAuditLogRecord OMRSAuditLogStore)
+           (org.odpi.openmetadata.repositoryservices.auditlog OMRSAuditLogDestination OMRSAuditLog)
+           (org.odpi.openmetadata.repositoryservices.connectors.stores.archivestore.properties OpenMetadataArchiveTypeStore OpenMetadataArchive)
+           (org.odpi.openmetadata.repositoryservices.connectors.stores.metadatacollectionstore.utilities OMRSRepositoryPropertiesUtilities)))
+
+(defonce ^:dynamic *repo-helper* nil)
+
+(defn set-repo-helper [repo-helper]
+  (alter-var-root #'*repo-helper* (constantly repo-helper)))
 
 (defprotocol Mappable
   (->map [obj]))
 
-
-(def find-type-def-by-guid
-  (fn [^OMRSRepositoryContentHelper repo-helper type-def-guid]
-    (if-let [type-def (.getTypeDef repo-helper "omrs" "guid" type-def-guid "find-type-def-by-guid")]
-      (->map type-def))))
-
-
-(def find-type-def-by-name
-  (fn [^OMRSRepositoryContentHelper repo-helper type-def-name]
-    (if-let [type-def (.getTypeDefByName repo-helper "omrs" type-def-name)]
-      (->map type-def))))
+(defn find-type-def-by-guid
+  ([type-def-guid]
+   (find-type-def-by-guid *repo-helper* type-def-guid))
+  ([^OMRSRepositoryContentHelper repo-helper type-def-guid]
+   (if-let [type-def (.getTypeDef repo-helper "omrs" "guid" type-def-guid "find-type-def-by-guid")]
+     (p/datafy type-def))))
 
 
-(def find-type-def
-  (fn [^OMRSRepositoryContentHelper repo-helper guid-or-name]
-    (let [type-def-guid (try
-                          (UUID/fromString guid-or-name)
-                          (catch IllegalArgumentException _))
-          type-def-name (when-not type-def-guid
-                          guid-or-name)]
-      (if type-def-guid
-        (find-type-def-by-guid repo-helper type-def-guid)
-        (find-type-def-by-name repo-helper type-def-name)))))
+(defn find-type-def-by-name
+  ([type-def-name]
+   (find-type-def-by-name *repo-helper* type-def-name))
+  ([^OMRSRepositoryContentHelper repo-helper type-def-name]
+   (if-let [type-def (.getTypeDefByName repo-helper "omrs" type-def-name)]
+     (datafy type-def))))
 
+(defn- maybe-guid [guid-str]
+  (try
+    (UUID/fromString guid-str)
+    (catch IllegalArgumentException _)))
 
-(defn find-attribute-type-def-by-guid [^OMRSRepositoryContentHelper repo-helper
-                                       attribute-type-guid]
-  (->map (.getAttributeTypeDef repo-helper
-           "omrs-source-name"
-           attribute-type-guid
-           "find-attribute-type-def-by-guid")))
+(defn find-type-def
+  ([guid-or-name]
+   (find-type-def *repo-helper* guid-or-name))
+  ([^OMRSRepositoryContentHelper repo-helper guid-or-name]
+   (cond
+     (maybe-guid guid-or-name) (find-type-def-by-guid repo-helper guid-or-name)
 
+     :else (find-type-def-by-name repo-helper guid-or-name))))
+
+(defn find-attribute-type-def-by-guid
+  ([attribute-type-guid]
+   (find-attribute-type-def-by-guid *repo-helper* attribute-type-guid))
+  ([^OMRSRepositoryContentHelper repo-helper attribute-type-guid]
+   (datafy (.getAttributeTypeDef repo-helper
+             "omrs-source-name"
+             attribute-type-guid
+             "find-attribute-type-def-by-guid"))))
+
+;; TODO
+;; Refactor into a property-key -> attribute type def map on load
 (defn find-type-def-attribute-by-property-key
-  [^OMRSRepositoryContentHelper repo-helper property-key]
-  (let [type-def-name  (namespace property-key)
-        type-def-name  (if (str/starts-with? type-def-name "openmetadata.")
-                         (.substring type-def-name (.length "openmetadata."))
-                         type-def-name)
-        attribute-name (name property-key)
-        type-def       (find-type-def-by-name repo-helper type-def-name)]
-    (->> (:openmetadata.TypeDef/propertiesDefinition type-def)
-      (filter #(= (:openmetadata.TypeDefAttribute/attributeName %) attribute-name))
-      (first))))
+  ([property-key]
+   (find-type-def-attribute-by-property-key *repo-helper* property-key))
+  ([^OMRSRepositoryContentHelper repo-helper property-key]
+   (let [type-def-name  (namespace property-key)
+         type-def-name  (if (str/starts-with? type-def-name "openmetadata.")
+                          (.substring type-def-name (.length "openmetadata."))
+                          type-def-name)
+         attribute-name (name property-key)
+         type-def       (find-type-def-by-name repo-helper type-def-name)]
+     (->> (:openmetadata.TypeDef/propertiesDefinition type-def)
+       (filter #(= (:openmetadata.TypeDefAttribute/attributeName %) attribute-name))
+       (first)))))
 
 
 (defn list-type-def-attributes
   "Resolves properties of the given type-def and its super type. Returns a sequence of type def attributes."
-  [^OMRSRepositoryContentHelper repo-helper type-def]
-  (let [type-def-guid   (:openmetadata.TypeDef/guid type-def)
-        type-def-name   (:openmetadata.TypeDef/name type-def)
-        super-type-guid (:openmetadata.TypeDef/superType type-def)
-        super-type-def  (when super-type-guid
-                          (find-type-def-by-guid repo-helper super-type-guid))
-        attrs           (->> (:openmetadata.TypeDef/propertiesDefinition type-def)
-                          (map #(assoc % :openmetadata.TypeDef/name type-def-name))
-                          (map #(assoc % :openmetadata.TypeDef/guid type-def-guid)))]
-    (if super-type-def
-      (concat (list-type-def-attributes repo-helper super-type-def) attrs)
-      attrs)))
+  ([type-def]
+   (list-type-def-attributes *repo-helper* type-def))
+  ([^OMRSRepositoryContentHelper repo-helper type-def]
+   (let [type-def-guid   (:openmetadata.TypeDef/guid type-def)
+         type-def-name   (:openmetadata.TypeDef/name type-def)
+         super-type-guid (:openmetadata.TypeDef/superType type-def)
+         super-type-def  (when super-type-guid
+                           (find-type-def-by-guid repo-helper super-type-guid))
+         attrs           (->> (:openmetadata.TypeDef/propertiesDefinition type-def)
+                           (map #(assoc % :openmetadata.TypeDef/name type-def-name))
+                           (map #(assoc % :openmetadata.TypeDef/guid type-def-guid)))]
+     (if super-type-def
+       (concat (list-type-def-attributes repo-helper super-type-def) attrs)
+       attrs))))
 
 (defn qualify-property-key [attr]
   (let [ns   (str "openmetadata." (:openmetadata.TypeDef/name attr))
@@ -80,20 +98,24 @@
     (keyword ns name)))
 
 (defn list-type-def-property-keys
-  [^OMRSRepositoryContentHelper repo-helper type-def]
-  (let [attrs (list-type-def-attributes repo-helper type-def)]
-    (map qualify-property-key attrs)))
+  ([type-def]
+   (list-type-def-property-keys *repo-helper* type-def))
+  ([^OMRSRepositoryContentHelper repo-helper type-def]
+   (let [attrs (list-type-def-attributes repo-helper type-def)]
+     (map qualify-property-key attrs))))
 
 (defn list-type-defs
-  [^OMRSRepositoryContentHelper repo-helper]
-  (map ->map (.getKnownTypeDefs repo-helper)))
+  ([]
+   (list-type-defs *repo-helper*))
+  ([^OMRSRepositoryContentHelper repo-helper]
+   (map datafy (.getKnownTypeDefs repo-helper))))
 
 (defn ->EntityDetail
-  ([^OMRSRepositoryContentHelper repo-helper source-name metadata-collection-id user-name type-name]
-   (->EntityDetail repo-helper source-name metadata-collection-id user-name type-name
+  ([source-name metadata-collection-id user-name type-name]
+   (->EntityDetail source-name metadata-collection-id user-name type-name
      (InstanceProperties.) Collections/EMPTY_LIST))
-  ([^OMRSRepositoryContentHelper repo-helper source-name metadata-collection-id user-name type-name instance-props classifications]
-   (let [entity-detail (.getNewEntity repo-helper
+  ([source-name metadata-collection-id user-name type-name instance-props classifications]
+   (let [entity-detail (.getNewEntity *repo-helper*
                          source-name
                          metadata-collection-id
                          InstanceProvenanceType/LOCAL_COHORT
@@ -103,10 +125,10 @@
                          classifications)]
      entity-detail)))
 
-(defmulti ->InstancePropertyValue (fn [repo_helper attr-type-def value]
+(defmulti ->InstancePropertyValue (fn [attr-type-def value]
                                     (:openmetadata.AttributeTypeDef/category attr-type-def)))
 
-(defmethod ->InstancePropertyValue "PRIMITIVE" [repo_helper attr-type-def value]
+(defmethod ->InstancePropertyValue "PRIMITIVE" [attr-type-def value]
   (let [primitive-category (-> (:openmetadata.PrimitiveDef/category attr-type-def)
                              (PrimitiveDefCategory/valueOf))]
     (doto (PrimitivePropertyValue.)
@@ -115,33 +137,33 @@
       (.setTypeName (.getName primitive-category))
       (.setTypeGUID (.getGUID primitive-category)))))
 
-(defn ->ArrayPropertyValue [repo-helper coll-type-def array-values]
+(defn ->ArrayPropertyValue [coll-type-def array-values]
   (let [size                  (count array-values)
         obj                   (doto (ArrayPropertyValue.)
                                 (.setArrayCount size))
         element-type-def-guid (-> (:openmetadata.CollectionDef/argumentTypes coll-type-def)
                                 (first))
-        element-type-def      (find-attribute-type-def-by-guid repo-helper element-type-def-guid)]
+        element-type-def      (find-attribute-type-def-by-guid element-type-def-guid)]
     (when array-values
       (do
         (doseq [[i v] (map vector (range size) array-values)]
-          (.setArrayValue i (->InstancePropertyValue repo-helper element-type-def v)))
+          (.setArrayValue i (->InstancePropertyValue element-type-def v)))
         obj))))
 
-(defn ->MapPropertyValue [repo-helper coll-type-def map-value]
+(defn ->MapPropertyValue [coll-type-def map-value]
   (let [obj                   (MapPropertyValue.)
         element-type-def-guid (-> (:openmetadata.CollectionDef/argumentTypes coll-type-def)
                                 (second))
-        value-type-def        (find-attribute-type-def-by-guid repo-helper element-type-def-guid)]
+        value-type-def        (find-attribute-type-def-by-guid element-type-def-guid)]
     (doseq [[k v] map-value]
-      (.setMapValue obj (str k) (->InstancePropertyValue repo-helper value-type-def v)))
+      (.setMapValue obj (str k) (->InstancePropertyValue value-type-def v)))
     obj))
 
-(defmethod ->InstancePropertyValue "COLLECTION" [repo-helper attr-type-def value]
+(defmethod ->InstancePropertyValue "COLLECTION" [attr-type-def value]
   (let [category (some-> (:openmetadata.CollectionDef/category attr-type-def))]
     (condp = category
-      "OM_COLLECTION_ARRAY" (->ArrayPropertyValue repo-helper attr-type-def value)
-      "OM_COLLECTION_MAP" (->MapPropertyValue repo-helper attr-type-def value))))
+      "OM_COLLECTION_ARRAY" (->ArrayPropertyValue attr-type-def value)
+      "OM_COLLECTION_MAP" (->MapPropertyValue attr-type-def value))))
 
 (def find-enum-element-def
   (memoize
@@ -150,10 +172,10 @@
         (filter (fn [x] (= (:openmetadata.EnumElementDef/value x) enum-name)))
         (first)))))
 
-(defmethod ->InstancePropertyValue "ENUM_DEF" [repo-helper attr-type-def value]
+(defmethod ->InstancePropertyValue "ENUM_DEF" [attr-type-def value]
   (let [value            (or value (:openmetadata.EnumDef/defaultValue attr-type-def))
         type-def-guid    (:openmetadata.AttributeTypeDef/guid attr-type-def)
-        enum-type-def    (find-attribute-type-def-by-guid repo-helper type-def-guid)
+        enum-type-def    (find-attribute-type-def-by-guid type-def-guid)
         enum-element-def (find-enum-element-def enum-type-def value)]
     (when enum-element-def
       (let [{:openmetadata.EnumElementDef/keys [ordinal description value]} enum-element-def]
@@ -162,69 +184,71 @@
           (.setDescription description)
           (.setSymbolicName value))))))
 
-(defmethod ->InstancePropertyValue :default [repo-helper attr-type-def value]
-  (println attr-type-def)
+(defmethod ->InstancePropertyValue :default [attr-type-def value]
   (doto (MapPropertyValue.)))
 
 
 (defn ->InstanceProperties
-  ([^OMRSRepositoryContentHelper repo-helper type-def-name properties]
-   (let [type-def  (find-type-def-by-name repo-helper type-def-name)
-         prop-keys (list-type-def-property-keys repo-helper type-def)
+  ([type-def-name properties]
+   (let [type-def  (find-type-def-by-name type-def-name)
+         prop-keys (list-type-def-property-keys type-def)
          obj       (InstanceProperties.)]
      (doseq [k prop-keys]
-       (let [type-def-attribute (find-type-def-attribute-by-property-key repo-helper k)
+       (let [type-def-attribute (find-type-def-attribute-by-property-key k)
              value              (or (when (qualified-keyword? k) (k properties))
                                   (get properties (keyword (name k))))
-             attribute-type-def (find-attribute-type-def-by-guid repo-helper (:openmetadata.TypeDefAttribute/attributeType type-def-attribute))
-             property-value     (->InstancePropertyValue repo-helper attribute-type-def value)]
+             attribute-type-def (find-attribute-type-def-by-guid (:openmetadata.TypeDefAttribute/attributeType type-def-attribute))
+             property-value     (->InstancePropertyValue attribute-type-def value)]
          (.setProperty obj (name k) property-value)))
      obj)))
 
-(defmulti InstancePropertyValue->val (fn [repo-helper property-value]
-                                       (type property-value)))
+(extend-type PrimitivePropertyValue
+  p/Datafiable
+  (datafy [^PrimitivePropertyValue x]
+    (p/datafy (.valueAsObject x))))
 
-(defmethod InstancePropertyValue->val nil [repo-helper property-value]
-  nil)
+(extend-type ArrayPropertyValue
+  p/Datafiable
+  (datafy [^ArrayPropertyValue x]
+    (when (> (.getArrayCount x) 0)
+      (some->> (.getArrayValues x)
+        (.getInstanceProperties)
+        (sort (fn [[k1 _] [k2 _]]
+                (< (Integer/valueOf k1) (Integer/valueOf k2))))
+        (mapv second)
+        datafy
+        (into [])))))
 
-(defmethod InstancePropertyValue->val PrimitivePropertyValue [repo-helper property-value]
-  (.valueAsObject property-value))
+(extend-type MapPropertyValue
+  p/Datafiable
+  (datafy [^MapPropertyValue x]
+    (when-let [instance-props (some-> (.getMapValues x) (.getInstanceProperties))]
+      (reduce
+        (fn [m [k pv]]
+          (assoc m k (datafy pv)))
+        {}
+        instance-props))))
 
-(defmethod InstancePropertyValue->val ArrayPropertyValue [repo-helper property-value]
-  (when (> (.getArrayCount property-value) 0)
-    (some->> (.getArrayValues property-value)
-      (.getInstanceProperties)
-      (sort (fn [[k1 _] [k2 _]]
-              (< (Integer/valueOf k1) (Integer/valueOf k2))))
-      (mapv second))))
+(extend-type EnumPropertyValue
+  p/Datafiable
+  (datafy [^EnumPropertyValue x]
+    (when x
+      (.getSymbolicName x))))
 
-(defmethod InstancePropertyValue->val MapPropertyValue [repo-helper property-value]
-  (when-let [instance-props (some-> (.getMapValues property-value) (.getInstanceProperties))]
-    (println instance-props)
-    (reduce
-      (fn [m [k pv]]
-        (assoc m k (InstancePropertyValue->val repo-helper pv)))
-      {}
-      instance-props)))
-
-(defmethod InstancePropertyValue->val EnumPropertyValue [repo-helper property-value]
-  (when property-value
-    (.getSymbolicName property-value)))
-
-(defn- collect-instance-map [repo-helper instance-props m qualified-key]
+(defn- collect-instance-map [instance-props m qualified-key]
   (let [k  (name qualified-key)
         pv (.getPropertyValue instance-props k)
-        v  (InstancePropertyValue->val repo-helper pv)]
+        v  (datafy pv)]
     (assoc m qualified-key v)))
 
 (defn InstanceProperties->map
-  [^OMRSRepositoryContentHelper repo-helper instance-type-guid instance-props]
-  (let [inst-type-def (find-type-def-by-guid repo-helper instance-type-guid)
-        property-keys (list-type-def-property-keys repo-helper inst-type-def)]
-    (reduce (partial collect-instance-map repo-helper instance-props) {} property-keys)))
+  [instance-type-guid instance-props]
+  (let [inst-type-def (find-type-def-by-guid instance-type-guid)
+        property-keys (list-type-def-property-keys inst-type-def)]
+    (reduce (partial collect-instance-map instance-props) {} property-keys)))
 
 (defn Classification->map
-  [^OMRSRepositoryContentHelper repo-helper ^Classification classification]
+  [^Classification classification]
   (let [instance-props (or (.getProperties classification) (InstanceProperties.))
         type-guid      (some-> (.getType classification) (.getTypeDefGUID))]
     (merge
@@ -242,53 +266,56 @@
            :version              (.getVersion classification)
            :status               (some-> (.getStatus classification) (.name))
            :statusOnDelete       (some-> (.getStatusOnDelete classification) (.name))}
-      (InstanceProperties->map repo-helper type-guid instance-props))))
+      (InstanceProperties->map type-guid instance-props))))
 
-(defn EntityDetail->map
-  [^OMRSRepositoryContentHelper repo-helper entity-detail]
-  (let [instance-props (or (.getProperties entity-detail) (InstanceProperties.))
-        type-guid      (some-> (.getType entity-detail) (.getTypeDefGUID))]
-    (merge
-      #:openmetadata.Entity
-          {:guid                 (.getGUID entity-detail)
-           :typeDefGUID          (some-> (.getType entity-detail) (.getTypeDefGUID))
-           :typeDefName          (some-> (.getType entity-detail) (.getTypeDefName))
-           :instanceURL          (.getInstanceURL entity-detail)
-           :classifications      (some->> (.getClassifications entity-detail) (mapv (partial Classification->map repo-helper)))
-           :metadataCollectionId (.getMetadataCollectionId entity-detail)
-           :createdBy            (.getCreatedBy entity-detail)
-           :updatedBy            (.getUpdatedBy entity-detail)
-           :createTime           (.getCreateTime entity-detail)
-           :updateTime           (.getUpdateTime entity-detail)
-           :version              (.getVersion entity-detail)
-           :status               (some-> (.getStatus entity-detail) (.name))
-           :statusOnDelete       (some-> (.getStatusOnDelete entity-detail) (.name))}
-      (InstanceProperties->map repo-helper type-guid instance-props))))
+(extend-type EntityDetail
+  p/Datafiable
+  (datafy [^EntityDetail entity-detail]
+    (let [instance-props (or (.getProperties entity-detail) (InstanceProperties.))
+          type-guid      (some-> (.getType entity-detail) (.getTypeDefGUID))]
+      (merge
+        #:openmetadata.Entity
+            {:guid                 (.getGUID entity-detail)
+             :typeDefGUID          (some-> (.getType entity-detail) (.getTypeDefGUID))
+             :typeDefName          (some-> (.getType entity-detail) (.getTypeDefName))
+             :instanceURL          (.getInstanceURL entity-detail)
+             :classifications      (some->> (.getClassifications entity-detail) (mapv Classification->map))
+             :metadataCollectionId (.getMetadataCollectionId entity-detail)
+             :createdBy            (.getCreatedBy entity-detail)
+             :updatedBy            (.getUpdatedBy entity-detail)
+             :createTime           (.getCreateTime entity-detail)
+             :updateTime           (.getUpdateTime entity-detail)
+             :version              (.getVersion entity-detail)
+             :status               (some-> (.getStatus entity-detail) (.name))
+             :statusOnDelete       (some-> (.getStatusOnDelete entity-detail) (.name))}
+        (InstanceProperties->map type-guid instance-props)))))
 
-(defn EntityProxy->map
-  [^OMRSRepositoryContentHelper repo-helper ^EntityProxy entity-proxy]
-  (let [instance-props (or (.getUniqueProperties entity-proxy) (InstanceProperties.))
-        type-guid      (some-> (.getType entity-proxy) (.getTypeDefGUID))]
-    (merge
-      #:openmetadata.Entity
-          {:guid                 (.getGUID entity-proxy)
-           :isProxy              true
-           :typeDefGUID          (some-> (.getType entity-proxy) (.getTypeDefGUID))
-           :typeDefName          (some-> (.getType entity-proxy) (.getTypeDefName))
-           :instanceURL          (.getInstanceURL entity-proxy)
-           :classifications      (some->> (.getClassifications entity-proxy) (mapv Classification->map))
-           :metadataCollectionId (.getMetadataCollectionId entity-proxy)
-           :createdBy            (.getCreatedBy entity-proxy)
-           :updatedBy            (.getUpdatedBy entity-proxy)
-           :createTime           (.getCreateTime entity-proxy)
-           :updateTime           (.getUpdateTime entity-proxy)
-           :version              (.getVersion entity-proxy)
-           :status               (some-> (.getStatus entity-proxy) (.name))
-           :statusOnDelete       (some-> (.getStatusOnDelete entity-proxy) (.name))}
-      (InstanceProperties->map repo-helper type-guid instance-props))))
+(extend-type EntityProxy
+  p/Datafiable
+  (datafy [^EntityProxy entity-proxy]
+    (let [instance-props (or (.getUniqueProperties entity-proxy) (InstanceProperties.))
+          type-guid      (some-> (.getType entity-proxy) (.getTypeDefGUID))]
+      (merge
+        #:openmetadata.Entity
+            {:guid                 (.getGUID entity-proxy)
+             :isProxy              true
+             :typeDefGUID          (some-> (.getType entity-proxy) (.getTypeDefGUID))
+             :typeDefName          (some-> (.getType entity-proxy) (.getTypeDefName))
+             :instanceURL          (.getInstanceURL entity-proxy)
+             :classifications      (some->> (.getClassifications entity-proxy) (mapv Classification->map))
+             :metadataCollectionId (.getMetadataCollectionId entity-proxy)
+             :createdBy            (.getCreatedBy entity-proxy)
+             :updatedBy            (.getUpdatedBy entity-proxy)
+             :createTime           (.getCreateTime entity-proxy)
+             :updateTime           (.getUpdateTime entity-proxy)
+             :version              (.getVersion entity-proxy)
+             :status               (some-> (.getStatus entity-proxy) (.name))
+             :statusOnDelete       (some-> (.getStatusOnDelete entity-proxy) (.name))}
+        (InstanceProperties->map type-guid instance-props)))))
 
-(defn Relationship->map
-  [^OMRSRepositoryContentHelper repo-helper relationship]
+(extend-type Relationship
+  p/Datafiable
+  (datafy [^Relationship relationship]
   (let [instance-props (or (.getProperties relationship) (InstanceProperties.))
         type-guid      (some-> (.getType relationship) (.getTypeDefGUID))]
     (merge
@@ -306,7 +333,7 @@
            :version              (.getVersion relationship)
            :status               (some-> (.getStatus relationship) (.name))
            :statusOnDelete       (some-> (.getStatusOnDelete relationship) (.name))}
-      (InstanceProperties->map repo-helper type-guid instance-props))))
+      (InstanceProperties->map type-guid instance-props)))))
 
 (defn TypeDef->map
   [^TypeDef obj]
@@ -327,12 +354,12 @@
        :updateTime               (.getUpdateTime obj)
        :options                  (some-> (.getOptions obj))
        :externalStandardMappings (some->> (.getExternalStandardMappings obj)
-                                   (mapv ->map))
+                                   (mapv datafy))
        :validInstanceStatusList  (some->> (.getValidInstanceStatusList obj)
                                    (mapv #(.name %)))
        :initialStatus            (some-> (.getInitialStatus obj) (.name))
        :propertiesDefinition     (some->> (.getPropertiesDefinition obj)
-                                   (mapv ->map))})
+                                   (mapv datafy))})
 
 (defn AttributeTypeDef->map
   [^AttributeTypeDef obj]
@@ -418,40 +445,18 @@
     (init-repo-content-manager archive user-id)))
 
 (extend-type TypeDef
-  Mappable
-  (->map [^TypeDef obj]
-    #:openmetadata.TypeDef
-        {:guid                     (.getGUID obj)
-         :name                     (.getName obj)
-         :status                   (some-> (.getStatus obj) (.name))
-         :version                  (.getVersion obj)
-         :versionName              (.getVersionName obj)
-         :category                 (some-> (.getCategory obj) (.name))
-         :superType                (some-> (.getSuperType obj) (.getGUID))
-         :description              (.getDescription obj)
-         :descriptionGUID          (.getDescriptionGUID obj)
-         :origin                   (.getOrigin obj)
-         :createdBy                (.getCreatedBy obj)
-         :updatedBy                (.getUpdatedBy obj)
-         :createTime               (.getCreateTime obj)
-         :updateTime               (.getUpdateTime obj)
-         :options                  (some-> (.getOptions obj))
-         :externalStandardMappings (some->> (.getExternalStandardMappings obj)
-                                     (mapv ->map))
-         :validInstanceStatusList  (some->> (.getValidInstanceStatusList obj)
-                                     (mapv #(.name %)))
-         :initialStatus            (.getInitialStatus obj)
-         :propertiesDefinition     (some->> (.getPropertiesDefinition obj)
-                                     (mapv ->map))}))
+  p/Datafiable
+  (datafy [^TypeDef obj]
+    (TypeDef->map obj)))
 
 (extend-type EntityDef
-  Mappable
-  (->map [^EntityDef obj]
-    (TypeDef->map ^TypeDef obj)))
+  p/Datafiable
+  (datafy [^EntityDef obj]
+    (TypeDef->map obj)))
 
 (extend-type RelationshipDef
-  Mappable
-  (->map [^RelationshipDef obj]
+  p/Datafiable
+  (datafy [^RelationshipDef obj]
     (merge (TypeDef->map obj)
       #:openmetadata.RelationshipDef
           {:propagationRule                 (some-> (.getPropagationRule obj) (.name))
@@ -469,8 +474,8 @@
            :endDef2AttributeCardinality     (some-> (.getEndDef2 obj) (.getAttributeCardinality) (.name))})))
 
 (extend-type ClassificationDef
-  Mappable
-  (->map [^ClassificationDef obj]
+  p/Datafiable
+  (datafy [^ClassificationDef obj]
     (merge (TypeDef->map obj)
       #:openmetadata.ClassificationDef
           {:validEntityDefs (some->> (.getValidEntityDefs obj)
@@ -478,8 +483,8 @@
            :propagatable    (.isPropagatable obj)})))
 
 (extend-type PrimitiveDefCategory
-  Mappable
-  (->map [^PrimitiveDefCategory obj]
+  p/Datafiable
+  (datafy [^PrimitiveDefCategory obj]
     #:openmetadata.PrimitiveDefCategory
         {:guid          (.getGUID obj)
          :name          (.getName obj)
@@ -487,15 +492,15 @@
          :javaClassName (.getJavaClassName obj)}))
 
 (extend-type PrimitiveDef
-  Mappable
-  (->map [^PrimitiveDef obj]
+  p/Datafiable
+  (datafy [^PrimitiveDef obj]
     (merge (AttributeTypeDef->map obj)
       #:openmetadata.PrimitiveDef
           {:category (some-> (.getPrimitiveDefCategory obj) (.name))})))
 
 (extend-type CollectionDefCategory
-  Mappable
-  (->map [^CollectionDefCategory obj]
+  p/Datafiable
+  (datafy [^CollectionDefCategory obj]
     #:openmetadata.CollectionDefCategory
         {:ordinal       (.getOrdinal obj)
          :name          (.getName obj)
@@ -503,8 +508,8 @@
          :javaClassName (.getJavaClassName obj)}))
 
 (extend-type CollectionDef
-  Mappable
-  (->map [^CollectionDef obj]
+  p/Datafiable
+  (datafy [^CollectionDef obj]
     (merge (AttributeTypeDef->map obj)
       #:openmetadata.CollectionDef
           {:category      (some-> (.getCollectionDefCategory obj) (.name))
@@ -513,8 +518,8 @@
                             (mapv #(.getGUID %)))})))
 
 (extend-type EnumElementDef
-  Mappable
-  (->map [^EnumElementDef obj]
+  p/Datafiable
+  (datafy [^EnumElementDef obj]
     #:openmetadata.EnumElementDef
         {:ordinal         (.getOrdinal obj)
          :value           (.getValue obj)
@@ -522,16 +527,16 @@
          :descriptionGUID (.getDescriptionGUID obj)}))
 
 (extend-type EnumDef
-  Mappable
-  (->map [^EnumDef obj]
+  p/Datafiable
+  (datafy [^EnumDef obj]
     (merge (AttributeTypeDef->map ^AttributeTypeDef obj)
       #:openmetadata.EnumDef
           {:defaultValue (some-> (.getDefaultValue obj) (.getValue))
-           :elementDefs  (some->> (.getElementDefs obj) (mapv #(->map %)))})))
+           :elementDefs  (some->> (.getElementDefs obj) (mapv datafy))})))
 
 (extend-type TypeDefAttribute
-  Mappable
-  (->map [^TypeDefAttribute obj]
+  p/Datafiable
+  (datafy [^TypeDefAttribute obj]
     #:openmetadata.TypeDefAttribute
         {:attributeName            (.getAttributeName obj)
          :attributeType            (some-> (.getAttributeType obj) (.getGUID))
@@ -546,17 +551,17 @@
          :isUnique                 (.isUnique obj)
          :defaultValue             (.getDefaultValue obj)
          :externalStandardMappings (some->> (.getExternalStandardMappings obj)
-                                     (mapv ->map))}))
+                                     (mapv datafy))}))
 
 (extend-type ExternalStandardMapping
-  Mappable
-  (->map [^ExternalStandardMapping obj]
+  p/Datafiable
+  (datafy [^ExternalStandardMapping obj]
     #:openmetadata.ExternalStandardMapping
         {:standardName         (.getStandardName obj)
          :standardOrganization (.getStandardOrganization obj)
          :standardTypeName     (.getStandardTypeName obj)}))
 
-(defn map->InstanceType [repo-helper type-def]
+(defn map->InstanceType [type-def]
   (doto (InstanceType.)
     (.setTypeDefGUID (:openmetadata.TypeDef/guid type-def))
     (.setTypeDefName (:openmetadata.TypeDef/name type-def))
@@ -566,19 +571,19 @@
     (.setTypeDefDescriptionGUID (:openmetadata.TypeDef/descriptionGUID type-def))
     (.setTypeDefVersion (:openmetadata.TypeDef/version type-def))))
 
-(defn map->InstanceProperties [repo-helper type-def m]
-  (let [prop-keys (list-type-def-property-keys repo-helper type-def)
+(defn map->InstanceProperties [type-def m]
+  (let [prop-keys (list-type-def-property-keys type-def)
         obj       (InstanceProperties.)]
     (doseq [k prop-keys]
-      (let [type-def-attribute (find-type-def-attribute-by-property-key repo-helper k)
+      (let [type-def-attribute (find-type-def-attribute-by-property-key k)
             value              (or (when (qualified-keyword? k) (k m))
                                  (get m (keyword (name k))))
-            attribute-type-def (find-attribute-type-def-by-guid repo-helper (:openmetadata.TypeDefAttribute/attributeType type-def-attribute))
-            property-value     (->InstancePropertyValue repo-helper attribute-type-def value)]
+            attribute-type-def (find-attribute-type-def-by-guid (:openmetadata.TypeDefAttribute/attributeType type-def-attribute))
+            property-value     (->InstancePropertyValue attribute-type-def value)]
         (.setProperty obj (name k) property-value)))
     obj))
 
-(defn map->Classification [repo-helper m]
+(defn map->Classification [m]
   (let [{:openmetadata.Classification/keys
          [name
           origin
@@ -600,12 +605,12 @@
           statusOnDelete
           mappingProperties]} m
         type-def       (if typeDefGUID
-                         (find-type-def-by-guid repo-helper typeDefGUID)
-                         (find-type-def-by-name repo-helper typeDefName))
-        inst-type      (map->InstanceType repo-helper type-def)
+                         (find-type-def-by-guid typeDefGUID)
+                         (find-type-def-by-name typeDefName))
+        inst-type      (map->InstanceType type-def)
         inst-prov-type (or (some-> instanceProvenanceType (InstanceProvenanceType/valueOf))
                          InstanceProvenanceType/UNKNOWN)
-        inst-props     (map->InstanceProperties repo-helper type-def m)]
+        inst-props     (map->InstanceProperties type-def m)]
     (doto (Classification.)
       (.setName name)
       (.setType inst-type)
@@ -628,7 +633,7 @@
       (.setMappingProperties mappingProperties))))
 
 
-(defn map->EntityDetail [repo-helper m]
+(defn map->EntityDetail [m]
   (let [{:openmetadata.Entity/keys
          [guid
           typeDefGUID
@@ -650,15 +655,15 @@
           mappingProperties
           classifications]} m
         type-def       (if typeDefGUID
-                         (find-type-def-by-guid repo-helper typeDefGUID)
-                         (find-type-def-by-name repo-helper typeDefName))
-        inst-type      (map->InstanceType repo-helper type-def)
+                         (find-type-def-by-guid typeDefGUID)
+                         (find-type-def-by-name typeDefName))
+        inst-type      (map->InstanceType type-def)
         inst-prov-type (or (some-> instanceProvenanceType (InstanceProvenanceType/valueOf))
                          InstanceProvenanceType/UNKNOWN)
         guid           (or guid (str (UUID/randomUUID)))
-        inst-props     (map->InstanceProperties repo-helper type-def m)
+        inst-props     (map->InstanceProperties type-def m)
         cls            (->> (or classifications [])
-                         (map #(map->Classification repo-helper %)))]
+                         (map #(map->Classification %)))]
     (doto (EntityDetail.)
       (.setGUID guid)
       (.setType inst-type)
@@ -681,7 +686,7 @@
       (.setClassifications (LinkedList. cls)))))
 
 
-(defn map->EntitySummary [repo-helper m]
+(defn map->EntitySummary [m]
   (let [{:openmetadata.Entity/keys
          [guid
           typeDefGUID
@@ -703,14 +708,14 @@
           mappingProperties
           classifications]} m
         type-def       (if typeDefGUID
-                         (find-type-def-by-guid repo-helper typeDefGUID)
-                         (find-type-def-by-name repo-helper typeDefName))
-        inst-type      (map->InstanceType repo-helper type-def)
+                         (find-type-def-by-guid typeDefGUID)
+                         (find-type-def-by-name typeDefName))
+        inst-type      (map->InstanceType type-def)
         inst-prov-type (or (some-> instanceProvenanceType (InstanceProvenanceType/valueOf))
                          InstanceProvenanceType/UNKNOWN)
         guid           (or guid (str (UUID/randomUUID)))
         cls            (->> (or classifications [])
-                         (map #(map->Classification repo-helper %)))]
+                         (map #(map->Classification %)))]
     (doto (EntitySummary.)
       (.setGUID guid)
       (.setType inst-type)
@@ -732,7 +737,7 @@
       (.setClassifications (LinkedList. cls)))))
 
 
-(defn map->EntityProxy [repo-helper m]
+(defn map->EntityProxy [m]
   (let [{:openmetadata.Entity/keys
          [guid
           typeDefGUID
@@ -754,15 +759,15 @@
           mappingProperties
           classifications]} m
         type-def       (if typeDefGUID
-                         (find-type-def-by-guid repo-helper typeDefGUID)
-                         (find-type-def-by-name repo-helper typeDefName))
-        inst-type      (map->InstanceType repo-helper type-def)
+                         (find-type-def-by-guid typeDefGUID)
+                         (find-type-def-by-name typeDefName))
+        inst-type      (map->InstanceType type-def)
         inst-prov-type (or (some-> instanceProvenanceType (InstanceProvenanceType/valueOf))
                          InstanceProvenanceType/UNKNOWN)
         guid           (or guid (str (UUID/randomUUID)))
-        inst-props     (map->InstanceProperties repo-helper type-def m)
+        inst-props     (map->InstanceProperties type-def m)
         cls            (->> (or classifications [])
-                         (map #(map->Classification repo-helper %)))]
+                         (map #(map->Classification %)))]
     (doto (EntityProxy.)
       (.setGUID guid)
       (.setType inst-type)
@@ -785,7 +790,7 @@
       (.setClassifications (LinkedList. cls)))))
 
 
-(defn map->Relationship [repo-helper r e1 e2]
+(defn map->Relationship [r e1 e2]
   (let [{:openmetadata.Relationship/keys
          [guid
           typeDefGUID
@@ -808,15 +813,15 @@
           entityOneGUID
           entityTwoGUID]} r
         type-def         (if typeDefGUID
-                           (find-type-def-by-guid repo-helper typeDefGUID)
-                           (find-type-def-by-name repo-helper typeDefName))
-        inst-type        (map->InstanceType repo-helper type-def)
+                           (find-type-def-by-guid typeDefGUID)
+                           (find-type-def-by-name typeDefName))
+        inst-type        (map->InstanceType type-def)
         inst-prov-type   (or (some-> instanceProvenanceType (InstanceProvenanceType/valueOf))
                            InstanceProvenanceType/UNKNOWN)
         guid             (or guid (str (UUID/randomUUID)))
-        inst-props       (map->InstanceProperties repo-helper type-def r)
-        entity-proxy-one (map->EntityProxy repo-helper e1)
-        entity-proxy-two (map->EntityProxy repo-helper e2)]
+        inst-props       (map->InstanceProperties type-def r)
+        entity-proxy-one (map->EntityProxy e1)
+        entity-proxy-two (map->EntityProxy e2)]
     (doto (Relationship.)
       (.setGUID guid)
       (.setType inst-type)

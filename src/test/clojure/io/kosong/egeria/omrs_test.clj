@@ -1,6 +1,7 @@
 (ns io.kosong.egeria.omrs-test
   (:use [midje.sweet])
   (:require [io.kosong.egeria.omrs :as omrs]
+            [clojure.datafy]
             [clojure.java.io :as io]
             [clojure.edn :as edn]
             [clojure.string :as str])
@@ -39,22 +40,25 @@
 
 (def ^:dynamic *repo-helper* (new-repo-helper))
 
-(let [^EntityDetail entity-detail (omrs/->EntityDetail *repo-helper* "repl" "1234" "alice" "CSVFile")
-      csv-file                    (omrs/EntityDetail->map *repo-helper* entity-detail)]
+(let [^EntityDetail entity-detail (binding [omrs/*repo-helper* *repo-helper*]
+                                    (omrs/->EntityDetail "repl" "1234" "alice" "CSVFile"))
+      csv-file                    (binding [omrs/*repo-helper* *repo-helper*]
+                                    (clojure.datafy/datafy entity-detail))]
   (fact "EntityDetail object"
     entity-detail =not=> nil?)
   (fact "EntityDetail type def name"
     (-> entity-detail (.getType) (.getTypeDefName)) => "CSVFile"))
 
 (facts "Create InstanceProperties object from map"
-  (let [^InstanceProperties obj (omrs/->InstanceProperties *repo-helper* "CSVFile"
-                                  {:name                 "Week 1: Drop Foot Clinical Trial Measurements"
-                                   :description          "One week's data covering foot angle, hip displacement and mobility measurements."
-                                   :qualifiedName        "file://secured/research/clinical-trials/drop-foot/DropFootMeasurementsWeek1.csv"
-                                   :fileType             "csv"
-                                   :ownerType            "UserId"
-                                   :additionalProperties {"a" "1"
-                                                          "b" "2"}})]
+  (let [^InstanceProperties obj (binding [omrs/*repo-helper* *repo-helper*]
+                                  (omrs/->InstanceProperties "CSVFile"
+                                    {:name                 "Week 1: Drop Foot Clinical Trial Measurements"
+                                     :description          "One week's data covering foot angle, hip displacement and mobility measurements."
+                                     :qualifiedName        "file://secured/research/clinical-trials/drop-foot/DropFootMeasurementsWeek1.csv"
+                                     :fileType             "csv"
+                                     :ownerType            "UserId"
+                                     :additionalProperties {"a" "1"
+                                                            "b" "2"}}))]
     (fact "should have expected property count"
       (some-> (.getPropertyCount obj) => 15))
     (fact "name property should have primitive string category"
@@ -63,10 +67,11 @@
       (some-> (.getPropertyValue obj "name") (.valueAsObject)) => "Week 1: Drop Foot Clinical Trial Measurements")))
 
 (facts "Build EntityDetail from Clojure map"
-  (let [entity-detail (omrs/map->EntityDetail *repo-helper*
-                        (-> (io/resource "DataSet/iris.edn")
-                          (slurp)
-                          (edn/read-string)))]
+  (let [iris-data (-> (io/resource "DataSet/iris.edn")
+                    (slurp)
+                    (edn/read-string))
+        entity-detail (binding [omrs/*repo-helper* *repo-helper*]
+                        (omrs/map->EntityDetail iris-data))]
     (fact "instance guid"
       (.getGUID entity-detail) =>
       "9bfbf0ca-3fb0-4980-a8b2-be903da4d1cf")

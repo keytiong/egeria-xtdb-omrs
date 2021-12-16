@@ -2,6 +2,7 @@
   (:require [io.kosong.egeria.omrs :as omrs]
             [xtdb.api :as xt]
             [clojure.data]
+            [clojure.datafy :refer [datafy]]
             [clojure.set :as set])
   (:import (org.odpi.openmetadata.repositoryservices.connectors.stores.metadatacollectionstore.properties.instances EntitySummary EntityDetail EntityProxy InstanceProperties Relationship InstanceGraph)
            (org.odpi.openmetadata.repositoryservices.connectors.stores.metadatacollectionstore.properties.typedefs TypeDef TypeDefCategory)
@@ -187,7 +188,8 @@
         helper                 (:repository-helper state)
         metadata-collection-id (:metadata-collection-id state)
         db                     (xt/db xtdb-node)
-        new-entity             (omrs/EntityDetail->map helper newEntityDetail)
+        new-entity             (binding [omrs/*repo-helper* helper]
+                                 (datafy newEntityDetail))
         entity-guid            (:openmetadata.Entity/guid new-entity)
         stored-entity          (first (fetch-instance db [:openmetadata.Entity/guid entity-guid]))]
     ;;(verify-unique-constraints xtdb-node helper new-entity)
@@ -202,7 +204,8 @@
         xtdb-node         (:xtdb-node state)
         helper            (:repository-helper state)
         db                (xt/db xtdb-node)
-        new-entity-proxy  (omrs/EntityProxy->map helper newEntityProxy)
+        new-entity-proxy  (binding [omrs/*repo-helper* helper]
+                            (datafy newEntityProxy))
         entity-proxy-guid (:openmetadata.Entity/guid new-entity-proxy)
         stored-entity     (first (fetch-instance db [:openmetadata.Entity/guid entity-proxy-guid]))]
     ;;(verify-unique-constraints xtdb-node helper new-entity-proxy)
@@ -217,7 +220,8 @@
         xtdb-node           (:xtdb-node state)
         helper              (:repository-helper state)
         db                  (xt/db xtdb-node)
-        new-relationship    (omrs/Relationship->map helper relationship)
+        new-relationship    (binding [omrs/*repo-helper* helper]
+                              (datafy relationship))
         relationship-guid   (:openmetadata.Relationship/guid new-relationship)
         stored-relationship (find-relationship-instance db relationship-guid)]
     ;;(verify-unique-constraints xtdb-node helper new-relationship)
@@ -247,7 +251,8 @@
       (let [msg-args (into-array String [guid class-name method-name repository-name])
             msg-defn (.getMessageDefinition (GraphOMRSErrorCode/ENTITY_PROXY_ONLY) msg-args)]
         (throw (EntityProxyOnlyException. msg-defn class-name method-name))))
-    (omrs/map->EntityDetail helper entity)))
+    (binding [omrs/*repo-helper* helper]
+      (omrs/map->EntityDetail entity))))
 
 
 (defn ^Relationship -getRelationshipFromStore [this ^String guid]
@@ -265,7 +270,8 @@
         entity-two-doc   (when entity-two-guid
                            (find-entity-instance db entity-two-guid))]
     (when relationship-doc
-      (omrs/map->Relationship helper relationship-doc entity-one-doc entity-two-doc))))
+      (binding [omrs/*repo-helper* helper]
+        (omrs/map->Relationship relationship-doc entity-one-doc entity-two-doc)))))
 
 
 (defn ^EntitySummary -getEntitySummaryFromStore [this ^String guid]
@@ -275,7 +281,8 @@
         db         (xt/db xtdb-node)
         entity-doc (find-entity-instance db guid)]
     (when entity-doc
-      (omrs/map->EntitySummary helper entity-doc))))
+      (binding [omrs/*repo-helper* helper]
+        (omrs/map->EntitySummary entity-doc)))))
 
 
 (defn ^EntityProxy -getEntityProxyFromStore [this ^String entityProxyGUID]
@@ -285,7 +292,8 @@
         db         (xt/db xtdb-node)
         entity-doc (find-entity-instance db entityProxyGUID)]
     (when entity-doc
-      (omrs/map->EntityProxy helper entity-doc))))
+      (binding [omrs/*repo-helper* helper]
+        (omrs/map->EntityProxy entity-doc)))))
 
 
 (defn ^List -getRelationshipsForEntity [this ^String entityGUID]
@@ -307,7 +315,8 @@
                    e2      (find-entity-instance db e2-guid)]
                [r e1 e2])))
       (map (fn [[r e1 e2]]
-             (omrs/map->Relationship helper r e1 e2))))))
+             (binding [omrs/*repo-helper* helper]
+               (omrs/map->Relationship r e1 e2)))))))
 
 
 (defn fetch-classifications [node entity-guid]
@@ -325,7 +334,8 @@
         xtdb-node                          (:xtdb-node state)
         helper                             (:repository-helper state)
         db                                 (xt/db xtdb-node)
-        new-entity                         (omrs/EntityDetail->map helper entityDetail)
+        new-entity                         (binding [omrs/*repo-helper* helper]
+                                             (datafy entityDetail))
         entity-guid                        (:openmetadata.Entity/guid new-entity)
         stored-entity                      (first (fetch-instance db [:openmetadata.Entity/guid entity-guid]))
         stored-classifications             (find-classification-instances db entity-guid)
@@ -364,7 +374,8 @@
         xtdb-node              (:xtdb-node state)
         helper                 (:repository-helper state)
         db                     (xt/db xtdb-node)
-        updated-relationship   (omrs/Relationship->map helper updatedRelationship)
+        updated-relationship   (binding [omrs/*repo-helper* helper]
+                                 (datafy updatedRelationship))
         relationship-guid      (:openmetadata.Entity/guid updated-relationship)
         stored-relationship    (find-relationship-instance db relationship-guid)
         new-relationship       (assoc updated-relationship :xt/id (:xt/id stored-relationship))
@@ -401,8 +412,7 @@
   (let [state     @(.state this)
         xtdb-node (:xtdb-node state)
         db        (xt/db xtdb-node)
-        ])
-  )
+        ]))
 
 (defn ^List -findEntitiesForTypes [this
                                    ^List validTypeNames,
@@ -449,8 +459,7 @@
                                            ^Boolean performTypeFiltering
                                            ^List validTypeNames]
   ;;TODO
-  (Collections/emptyList)
-  )
+  (Collections/emptyList))
 
 (defn ^List -findRelationshipsForType [this
                                        ^String typeName

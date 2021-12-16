@@ -25,7 +25,8 @@
                                         [org.testcontainers/kafka "1.15.2"]
                                         [clj-http "2.3.0"]
                                         [org.clojure/data.json "2.0.1"]
-                                        [com.xtdb/xtdb-rocksdb "1.19.0"]]
+                                        [com.xtdb/xtdb-rocksdb "1.19.0"]
+                                        [org.odpi.egeria/asset-reader-csv-sample "3.3"]]
                        :source-paths   ["dev"]
                        :resource-paths ["dev-resources"
                                         "src/test/resources"]
