@@ -1,5 +1,7 @@
-package io.kosong.egeria.omrs;
+package io.kosong.egeria.omrs.xtdb;
 
+import org.odpi.openmetadata.repositoryservices.connectors.stores.metadatacollectionstore.repositoryconnector.OMRSRepositoryHelper;
+import org.odpi.openmetadata.repositoryservices.connectors.stores.metadatacollectionstore.repositoryconnector.OMRSRepositoryValidator;
 import xtdb.api.IXtdb;
 import org.odpi.openmetadata.frameworks.auditlog.messagesets.ExceptionMessageDefinition;
 import org.odpi.openmetadata.frameworks.connectors.ffdc.ConnectorCheckedException;
@@ -11,6 +13,7 @@ import org.odpi.openmetadata.repositoryservices.ffdc.exception.RepositoryErrorEx
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Constructor;
 
 /**
  * The XtdbOMRSRepositoryConnector is a connector to a local open metadata repository that uses a Xtdb bitemporal data
@@ -37,28 +40,41 @@ public class XtdbOMRSRepositoryConnector extends OMRSRepositoryConnector
         String methodName = "getMetadataCollection";
 
         if (metadataCollection == null) {
-
-            if (metadataCollectionId != null) {
-                try {
-                    xtdbNode = IXtdb.startNode(new File("data/crux-node.edn"));
-                    metadataCollection = new XtdbOMRSMetadataCollection(this,
-                            repositoryName, repositoryHelper, repositoryValidator, metadataCollectionId, auditLog, xtdbNode);
-                } catch (Throwable t) {
-                    ExceptionMessageDefinition messageDefinition = OMRSErrorCode.UNEXPECTED_EXCEPTION.getMessageDefinition();
-                    throw new RepositoryErrorException(messageDefinition, this.getClass().getName(), methodName, t);
-                }
-            } else {
-                throw new OMRSLogicErrorException(OMRSErrorCode.NULL_METADATA_COLLECTION.getMessageDefinition(repositoryName),
-                        this.getClass().getName(),
-                        methodName);
-            }
+            throw new OMRSLogicErrorException(OMRSErrorCode.NULL_METADATA_COLLECTION.getMessageDefinition(repositoryName),
+                    this.getClass().getName(),
+                    methodName);
         }
+
         return metadataCollection;
     }
 
     @Override
     public void start() throws ConnectorCheckedException {
+        String methodName = "start";
         super.start();
+        if (metadataCollectionId != null) {
+            try {
+                xtdbNode = IXtdb.startNode(new File("data/xtdb-node.edn"));
+                Class clazz = Class.forName("io.kosong.egeria.omrs.xtdb.XtdbOMRSMetadataCollection");
+                Constructor constructor = clazz.getConstructor(new Class[] {
+                        XtdbOMRSRepositoryConnector.class,
+                        String.class,
+                        OMRSRepositoryHelper.class,
+                        OMRSRepositoryValidator.class,
+                        String.class
+                });
+                metadataCollection = (OMRSMetadataCollection) constructor.newInstance(this,
+                        repositoryName, repositoryHelper, repositoryValidator, metadataCollectionId);
+                metadataCollection.setAuditLog(auditLog);
+            } catch (Throwable t) {
+                ExceptionMessageDefinition messageDefinition = OMRSErrorCode.UNEXPECTED_EXCEPTION.getMessageDefinition();
+                throw new ConnectorCheckedException(messageDefinition, this.getClass().getName(), methodName, t);
+            }
+        } else {
+            throw new OMRSLogicErrorException(OMRSErrorCode.NULL_METADATA_COLLECTION.getMessageDefinition(repositoryName),
+                    this.getClass().getName(),
+                    methodName);
+        }
     }
 
     @Override

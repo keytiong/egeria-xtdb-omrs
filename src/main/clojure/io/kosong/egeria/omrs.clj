@@ -434,8 +434,7 @@
         (if original-type-def
           (let [updated-type-def (.applyPatch repo-util "" original-type-def patch "")]
             (swap! type-def-map assoc type-def-name updated-type-def)
-            (.updateTypeDef repo-content-manager "" updated-type-def))
-          (println type-def-name))))))
+            (.updateTypeDef repo-content-manager "" updated-type-def)))))))
 
 (defn ^OMRSRepositoryContentManager ->repository-content-manager
   [{:keys [user-id

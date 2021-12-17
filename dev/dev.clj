@@ -9,11 +9,11 @@
             [xtdb.api :as xtdb])
   (:import (org.odpi.openmetadata.repositoryservices.connectors.stores.metadatacollectionstore.properties.instances InstanceProperties PrimitivePropertyValue)
            (org.odpi.openmetadata.repositoryservices.connectors.stores.metadatacollectionstore.properties.typedefs PrimitiveDefCategory)
+           (io.kosong.egeria.omrs.xtdb XtdbOMRSRepositoryConnector)
            (java.util Collections)
            (java.nio.file Path Paths)
            (java.net URI)))
 
-(import io.kosong.egeria.omrs.XtdbOMRSRepositoryConnector)
 
 (def metadata-collection-id "b2718e10-9aa0-4944-8849-e856959cbbaa")
 
@@ -139,7 +139,7 @@
                          (.setProperty "name" (doto (PrimitivePropertyValue.)
                                                 (.setPrimitiveDefCategory PrimitiveDefCategory/OM_PRIMITIVE_TYPE_STRING)
                                                 (.setPrimitiveValue "iris"))))]
-    (omrs/->EntityDetail *repo-helper*
+    (omrs/->EntityDetail
       "repl"
       metadata-collection-id
       "alice"
@@ -189,4 +189,4 @@
   (->> (io/resource edn)
     (slurp)
     (edn/read-string)
-    (omrs/map->EntityDetail *repo-helper*)))
+    (omrs/map->EntityDetail)))

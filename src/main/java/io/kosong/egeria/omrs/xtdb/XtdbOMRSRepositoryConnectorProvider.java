@@ -1,4 +1,4 @@
-package io.kosong.egeria.omrs;
+package io.kosong.egeria.omrs.xtdb;
 
 
 

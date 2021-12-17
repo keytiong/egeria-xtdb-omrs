@@ -25,7 +25,7 @@
                  :cohort                        "devCohort"
                  :metadata-collection-name      "SUT_MDR"
                  :metadata-repository-type      "repository-proxy"
-                 :metadata-repository-connector {:connector-provider    "io.kosong.egeria.omrs.XtdbOMRSRepositoryConnectorProvider"
+                 :metadata-repository-connector {:connector-provider    "io.kosong.egeria.omrs.xtdb.XtdbOMRSRepositoryConnectorProvider"
                                                  :additional-properties {}}
                  }
 

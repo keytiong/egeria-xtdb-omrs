@@ -15,7 +15,7 @@
   :java-source-paths ["src/main/java"]
   :resource-paths ["src/main/resources"]
   :test-paths ["src/test/clojure"]
-  :aot [io.kosong.egeria.omrs.xtdb-metadata-store]
+  :aot [io.kosong.egeria.omrs.xtdb.xtdb-metadata-collection]
   :profiles {:dev     {:plugins        [[lein-midje "3.2.1"]]
                        :dependencies   [[clojure-complete "0.2.5"]
                                         [midje "1.9.9"]
