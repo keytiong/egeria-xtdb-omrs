@@ -12,50 +12,19 @@
            (io.kosong.egeria.omrs.xtdb XtdbOMRSRepositoryConnector)
            (java.util Collections)
            (java.nio.file Path Paths)
-           (java.net URI)))
+           (java.net URI)
+           (org.odpi.openmetadata.frameworks.connectors.properties ConnectionProperties)
+           (org.odpi.openmetadata.frameworks.connectors.properties.beans Connection)))
 
 
 (def metadata-collection-id "b2718e10-9aa0-4944-8849-e856959cbbaa")
 
-(def ^:dynamic *repo-helper*
-  (let [user-id               "test-user"
-        server-name           "my-server-name"
-        server-type           "my-server-type"
-        organization          "my-organization"
-        component-id          0
-        component-name        "my-component-name"
-        component-description "my-component-description"
-        component-wiki-url    "my-component-wiki-url"
-        audit-log-store       (omrs/->audit-log-store)
-        audit-log-destination (omrs/->audit-log-destination
-                                {:audit-log-stores [audit-log-store]
-                                 :server-name      server-name
-                                 :server-type      server-type
-                                 :organization     organization})
-        audit-log             (omrs/->audit-log
-                                {:audit-log-destination audit-log-destination
-                                 :component-id          component-id
-                                 :component-name        component-name
-                                 :component-description component-description
-                                 :component-wiki-url    component-wiki-url})
-        openmetadata-archive  (omrs/->openmetadata-archive)
-        content-manager       (omrs/->repository-content-manager
-                                {:user-id   user-id
-                                 :audit-log audit-log
-                                 :archive   openmetadata-archive})
-        repo-helper           (omrs/->repository-helper
-                                {:content-manager content-manager})]
-    repo-helper))
-
-
-
-
 (defmethod ig/init-key ::openmetadata-archive [_ _]
-  (omrs/->openmetadata-archive))
+  (omrs/->openmetadata-types-archive))
 
 (defmethod ig/init-key ::audit-log-store
   [_ _]
-  (omrs/->audit-log-store))
+  (omrs/->console-audit-log-store))
 
 (defmethod ig/init-key ::audit-log-destination
   [_ config]
@@ -75,16 +44,27 @@
 (defmethod ig/init-key ::repository-validator [_ config]
   (omrs/->repository-validator config))
 
-(defmethod ig/init-key ::xtdb-repository-connector [_ {:keys [metadata-collection-id
+(defmethod ig/init-key ::xtdb-connection [_ {:keys [configuration-properties]}]
+  (doto (Connection.)
+    (.setConfigurationProperties configuration-properties)))
+
+(defmethod ig/init-key ::xtdb-repository-connector [_ {:keys [connection
+                                                              repository-name
+                                                              metadata-collection-id
                                                               repository-validator
                                                               repository-helper
                                                               audit-log]}]
-  (doto (XtdbOMRSRepositoryConnector.)
-    (.setRepositoryHelper repository-helper)
-    (.setRepositoryValidator repository-validator)
-    (.setAuditLog audit-log)
-    (.setMetadataCollectionId metadata-collection-id)
-    (.start)))
+  (let [connection-props (ConnectionProperties. connection)
+        instance-id      (str (java.util.UUID/randomUUID))]
+    (println connection)
+    (doto (XtdbOMRSRepositoryConnector.)
+      (.setRepositoryName repository-name)
+      (.setRepositoryHelper repository-helper)
+      (.setRepositoryValidator repository-validator)
+      (.setAuditLog audit-log)
+      (.setMetadataCollectionId metadata-collection-id)
+      (.initialize instance-id connection-props)
+      (.start))))
 
 (defmethod ig/halt-key! ::xtdb-repository-connector [_ connector]
   (.disconnect connector))
@@ -120,17 +100,21 @@
                                  :component-wiki-url    "my-component-wiki-url"}
 
    ::repository-content-manager {:user-id   "alice"
-                                 :audit-log (ig/ref ::audit-log)
-                                 :archive   (ig/ref ::openmetadata-archive)}
+                                 :audit-log (ig/ref ::audit-log)}
 
    ::repository-helper          {:content-manager (ig/ref ::repository-content-manager)}
 
    ::repository-validator       {:content-manager (ig/ref ::repository-content-manager)}
 
-   ::xtdb-repository-connector  {:metadata-collection-id "b2718e10-9aa0-4944-8849-e856959cbbaa"
+   ::xtdb-connection            {:configuration-properties {"xtdbConfigPath" "dev-resources/xtdb-node.edn"}}
+
+   ::xtdb-repository-connector  {:connection             (ig/ref ::xtdb-connection)
+                                 :repository-name        "dev"
+                                 :metadata-collection-id "b2718e10-9aa0-4944-8849-e856959cbbaa"
                                  :repository-helper      (ig/ref ::repository-helper)
                                  :repository-validator   (ig/ref ::repository-validator)
-                                 :audit-log              (ig/ref ::audit-log)}})
+                                 :audit-log              (ig/ref ::audit-log)
+                                 :config-properties      {"xtdbConfig" "data/xtdb-node.edn"}}})
 
 (integrant.repl/set-prep! (constantly egeria-config))
 
@@ -176,13 +160,37 @@
       instance-props
       Collections/EMPTY_LIST)))
 
-(defn xtdb-node []
-  (::xtdb-node integrant.repl.state/system))
+(defn repo-helper []
+  (::repository-helper integrant.repl.state/system))
+
+(defn connector []
+  (::xtdb-repository-connector integrant.repl.state/system))
 
 (defn metadata-collection []
-  (some->
-    (::xtdb-repository-connector integrant.repl.state/system)
+  (some-> (connector)
     (.getMetadataCollection)))
+
+(defn xtdb-node []
+  (some-> (connector)
+    (.getXtdbNode)
+    :node))
+
+(defn load-type-defs
+  []
+  (let [user-id              "garygeek"
+        metadata-collection  (metadata-collection)
+        archive              (::openmetadata-archive integrant.repl.state/system)
+        repo-content-manager (::repository-content-manager integrant.repl.state/system)
+        archive-type-store   (.getArchiveTypeStore archive)
+        archive-guid         (some-> (.getArchiveProperties archive)
+                               (.getArchiveGUID))]
+    (.setOpenMetadataTypesOriginGUID repo-content-manager archive-guid)
+    (doseq [attribute-type-def (.getAttributeTypeDefs archive-type-store)]
+      (.addAttributeTypeDef metadata-collection user-id attribute-type-def))
+    (doseq [type-def (.getNewTypeDefs archive-type-store)]
+      (.addTypeDef metadata-collection user-id type-def))
+    (doseq [^TypeDefPatch patch (.getTypeDefPatches archive-type-store)]
+      (.updateTypeDef metadata-collection user-id patch))))
 
 
 (defn load-entity-detail [edn]

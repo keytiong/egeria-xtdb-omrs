@@ -1,11 +1,12 @@
 (ns io.kosong.egeria.omrs
   (:require [clojure.string :as str]
             [clojure.core.protocols :as p]
-            [clojure.datafy :refer [datafy]])
+            [clojure.datafy :refer [datafy]]
+            [clojure.tools.logging :as log])
   (:import (java.util Collections LinkedList UUID)
            (org.odpi.openmetadata.repositoryservices.localrepository.repositorycontentmanager OMRSRepositoryContentHelper OMRSRepositoryContentManager OMRSRepositoryContentValidator)
            (org.odpi.openmetadata.repositoryservices.connectors.stores.metadatacollectionstore.properties.instances InstanceProvenanceType InstanceProperties PrimitivePropertyValue MapPropertyValue EnumPropertyValue ArrayPropertyValue EntityDetail InstanceType InstanceStatus EntityProxy Classification ClassificationOrigin Relationship EntitySummary)
-           (org.odpi.openmetadata.repositoryservices.connectors.stores.metadatacollectionstore.properties.typedefs PrimitiveDef PrimitiveDefCategory CollectionDefCategory CollectionDef EnumElementDef ClassificationDef AttributeTypeDef TypeDef TypeDefAttribute EntityDef RelationshipDef EnumDef ExternalStandardMapping TypeDefAttribute EnumElementDef TypeDefPatch TypeDefCategory)
+           (org.odpi.openmetadata.repositoryservices.connectors.stores.metadatacollectionstore.properties.typedefs PrimitiveDef PrimitiveDefCategory CollectionDefCategory CollectionDef EnumElementDef ClassificationDef AttributeTypeDef TypeDef TypeDefAttribute EntityDef RelationshipDef EnumDef ExternalStandardMapping TypeDefAttribute EnumElementDef TypeDefPatch TypeDefCategory AttributeTypeDefCategory TypeDefLink TypeDefStatus AttributeCardinality TypeDefAttributeStatus RelationshipEndDef RelationshipEndCardinality ClassificationPropagationRule)
            (org.odpi.openmetadata.opentypes OpenMetadataTypesArchive)
            (org.odpi.openmetadata.repositoryservices.connectors.stores.auditlogstore OMRSAuditLogRecord OMRSAuditLogStore)
            (org.odpi.openmetadata.repositoryservices.auditlog OMRSAuditLogDestination OMRSAuditLog)
@@ -14,11 +15,8 @@
 
 (defonce ^:dynamic *repo-helper* nil)
 
-(defn set-repo-helper [repo-helper]
+(defn set-repo-helper! [repo-helper]
   (alter-var-root #'*repo-helper* (constantly repo-helper)))
-
-(defprotocol Mappable
-  (->map [obj]))
 
 (defn find-type-def-by-guid
   ([type-def-guid]
@@ -26,7 +24,6 @@
   ([^OMRSRepositoryContentHelper repo-helper type-def-guid]
    (if-let [type-def (.getTypeDef repo-helper "omrs" "guid" type-def-guid "find-type-def-by-guid")]
      (p/datafy type-def))))
-
 
 (defn find-type-def-by-name
   ([type-def-name]
@@ -54,7 +51,7 @@
    (find-attribute-type-def-by-guid *repo-helper* attribute-type-guid))
   ([^OMRSRepositoryContentHelper repo-helper attribute-type-guid]
    (datafy (.getAttributeTypeDef repo-helper
-             "omrs-source-name"
+             "local"
              attribute-type-guid
              "find-attribute-type-def-by-guid"))))
 
@@ -316,24 +313,24 @@
 (extend-type Relationship
   p/Datafiable
   (datafy [^Relationship relationship]
-  (let [instance-props (or (.getProperties relationship) (InstanceProperties.))
-        type-guid      (some-> (.getType relationship) (.getTypeDefGUID))]
-    (merge
-      #:openmetadata.Relationship
-          {:guid                 (.getGUID relationship)
-           :typeDefGUID          (some-> (.getType relationship) (.getTypeDefGUID))
-           :typeDefName          (some-> (.getType relationship) (.getTypeDefName))
-           :entityOneGUID        (some-> (.getEntityOneProxy relationship) (.getGUID))
-           :entityTwoGUID        (some-> (.getEntityTwoProxy relationship) (.getGUID))
-           :metadataCollectionId (.getMetadataCollectionId relationship)
-           :createdBy            (.getCreatedBy relationship)
-           :updatedBy            (.getUpdatedBy relationship)
-           :createTime           (.getCreateTime relationship)
-           :updateTime           (.getUpdateTime relationship)
-           :version              (.getVersion relationship)
-           :status               (some-> (.getStatus relationship) (.name))
-           :statusOnDelete       (some-> (.getStatusOnDelete relationship) (.name))}
-      (InstanceProperties->map type-guid instance-props)))))
+    (let [instance-props (or (.getProperties relationship) (InstanceProperties.))
+          type-guid      (some-> (.getType relationship) (.getTypeDefGUID))]
+      (merge
+        #:openmetadata.Relationship
+            {:guid                 (.getGUID relationship)
+             :typeDefGUID          (some-> (.getType relationship) (.getTypeDefGUID))
+             :typeDefName          (some-> (.getType relationship) (.getTypeDefName))
+             :entityOneGUID        (some-> (.getEntityOneProxy relationship) (.getGUID))
+             :entityTwoGUID        (some-> (.getEntityTwoProxy relationship) (.getGUID))
+             :metadataCollectionId (.getMetadataCollectionId relationship)
+             :createdBy            (.getCreatedBy relationship)
+             :updatedBy            (.getUpdatedBy relationship)
+             :createTime           (.getCreateTime relationship)
+             :updateTime           (.getUpdateTime relationship)
+             :version              (.getVersion relationship)
+             :status               (some-> (.getStatus relationship) (.name))
+             :statusOnDelete       (some-> (.getStatusOnDelete relationship) (.name))}
+        (InstanceProperties->map type-guid instance-props)))))
 
 (defn TypeDef->map
   [^TypeDef obj]
@@ -372,7 +369,7 @@
        :description     (.getDescription obj)
        :descriptionGUID (.getDescriptionGUID obj)})
 
-(defn ^OpenMetadataArchive ->openmetadata-archive
+(defn ^OpenMetadataArchive ->openmetadata-types-archive
   []
   (-> (OpenMetadataTypesArchive.)
     (.getOpenMetadataArchive)))
@@ -381,11 +378,11 @@
   []
   (proxy [OMRSAuditLogStore] []
     (storeLogRecord [^OMRSAuditLogRecord record]
-      #_(println (str record)))))
+      (log/info record))))
 
-(defn ->audit-log-store
+(defn ->null-audit-log-store
   []
-  (->console-audit-log-store))
+  (proxy [OMRSAuditLogStore] []))
 
 (defn ->audit-log-destination
   [{:keys [audit-log-stores
@@ -421,27 +418,25 @@
         repo-util          (OMRSRepositoryPropertiesUtilities.)
         archive-guid       (some-> (.getArchiveProperties archive)
                              (.getArchiveGUID))
-        type-def-map       (atom {})]
+        name-type-def-map  (transient {})]
     (.setOpenMetadataTypesOriginGUID repo-content-manager archive-guid)
-    (doseq [type-def (.getNewTypeDefs archive-type-store)]
-      (swap! type-def-map assoc (.getName type-def) type-def)
-      (.addTypeDef repo-content-manager user-id type-def))
     (doseq [attribute-type-def (.getAttributeTypeDefs archive-type-store)]
       (.addAttributeTypeDef repo-content-manager user-id attribute-type-def))
+    (doseq [type-def (.getNewTypeDefs archive-type-store)]
+      (.addTypeDef repo-content-manager user-id type-def)
+      (assoc! name-type-def-map (.getName type-def) type-def))
     (doseq [^TypeDefPatch patch (.getTypeDefPatches archive-type-store)]
       (let [type-def-name     (.getTypeDefName patch)
-            original-type-def (get @type-def-map type-def-name)]
+            original-type-def (get name-type-def-map type-def-name)]
         (if original-type-def
           (let [updated-type-def (.applyPatch repo-util "" original-type-def patch "")]
-            (swap! type-def-map assoc type-def-name updated-type-def)
+            (assoc! name-type-def-map type-def-name updated-type-def)
             (.updateTypeDef repo-content-manager "" updated-type-def)))))))
 
 (defn ^OMRSRepositoryContentManager ->repository-content-manager
   [{:keys [user-id
-           audit-log
-           archive]}]
-  (doto (OMRSRepositoryContentManager. user-id audit-log)
-    (init-repo-content-manager archive user-id)))
+           audit-log]}]
+  (OMRSRepositoryContentManager. user-id audit-log))
 
 (extend-type TypeDef
   p/Datafiable
@@ -495,7 +490,7 @@
   (datafy [^PrimitiveDef obj]
     (merge (AttributeTypeDef->map obj)
       #:openmetadata.PrimitiveDef
-          {:category (some-> (.getPrimitiveDefCategory obj) (.name))})))
+          {:primitiveDefCategory (some-> (.getPrimitiveDefCategory obj) (.name))})))
 
 (extend-type CollectionDefCategory
   p/Datafiable
@@ -511,10 +506,10 @@
   (datafy [^CollectionDef obj]
     (merge (AttributeTypeDef->map obj)
       #:openmetadata.CollectionDef
-          {:category      (some-> (.getCollectionDefCategory obj) (.name))
-           :argumentCount (.getArgumentCount obj)
-           :argumentTypes (some->> (.getArgumentTypes obj)
-                            (mapv #(.getGUID %)))})))
+          {:collectionDefCategory (some-> (.getCollectionDefCategory obj) (.name))
+           :argumentCount         (.getArgumentCount obj)
+           :argumentTypes         (some->> (.getArgumentTypes obj)
+                                    (mapv #(.name %)))})))
 
 (extend-type EnumElementDef
   p/Datafiable
@@ -559,6 +554,251 @@
         {:standardName         (.getStandardName obj)
          :standardOrganization (.getStandardOrganization obj)
          :standardTypeName     (.getStandardTypeName obj)}))
+
+(defn ->TypeDefLink [guid]
+  (let [repo-helper  *repo-helper*
+        type-def-obj (.getTypeDef repo-helper
+                       "unknown"
+                       "guid"
+                       guid,
+                       "->TypeDefLink")]
+    (doto (TypeDefLink.)
+      (.setName (.getName type-def-obj))
+      (.setGUID (.getGUID type-def-obj))
+      (.setStatus (.getStatus type-def-obj))
+      (.setReplacedByTypeGUID (.getReplacedByTypeGUID type-def-obj))
+      (.setReplacedByTypeName (.getReplacedByTypeName type-def-obj)))))
+
+(defn map->ExternalStandardMapping [m]
+  (let [{:openmetadata.ExternalStandardMapping/keys [standardName
+                                                     standardOrganization
+                                                     standardTypeName]} m]
+    (doto (ExternalStandardMapping.)
+      (.setStandardName standardName)
+      (.setStandardOrganization standardOrganization)
+      (.setStandardTypeName standardTypeName))))
+
+(defn set-attribute-type-def-fields [^AttributeTypeDef obj m]
+  (let [{:openmetadata.AttributeTypeDef/keys [version
+                                              versionName
+                                              category
+                                              guid
+                                              name
+                                              description
+                                              descriptionGUID]} m
+        category (some-> category (AttributeTypeDefCategory/valueOf))]
+    (doto obj
+      (.setName name)
+      (.setVersion version)
+      (.setVersionName versionName)
+      (.setCategory category)
+      (.setGUID guid)
+      (.setDescription description)
+      (.setDescriptionGUID descriptionGUID))))
+
+(defn map->PrimitiveDef [m]
+  (let [primitiveDefCategory (:openmetadata.PrimitiveDef/primitiveDefCategory m)
+        primitiveDefCategory (PrimitiveDefCategory/valueOf primitiveDefCategory)
+        obj                  (PrimitiveDef.)]
+    (set-attribute-type-def-fields obj m)
+    (doto obj
+      (.setPrimitiveDefCategory primitiveDefCategory))))
+
+(defn map->CollectionDef [m]
+  (let [{:openmetadata.CollectionDef/keys [collectionDefCategory
+                                           argumentCount
+                                           argumentTypes]} m
+        collectionDefCategory (some-> collectionDefCategory (CollectionDefCategory/valueOf))
+        argumentTypes         (->> argumentTypes
+                                (map #(PrimitiveDefCategory/valueOf %))
+                                (into [])
+                                (doall))
+        obj                   (CollectionDef.)]
+    (set-attribute-type-def-fields obj m)
+    (doto obj
+      (.setCollectionDefCategory collectionDefCategory)
+      (.setArgumentCount argumentCount)
+      (.setArgumentTypes argumentTypes))))
+
+(defn map->EnumElementDef [m]
+  (let [{:openmetadata.EnumElementDef/keys [ordinal
+                                            value
+                                            description
+                                            descriptionGUID]} m]
+    (doto (EnumElementDef.)
+      (.setOrdinal ordinal)
+      (.setValue value)
+      (.setDescription description)
+      (.setDescriptionGUID descriptionGUID))))
+
+(defn map->EnumDef [m]
+  (let [{:openmetadata.EnumDef/keys [defaultValue
+                                     elementDefs]} m
+        defaultValue (when defaultValue
+                       (->> elementDefs
+                         (filter #(= (:openmetadata.EnumElementDef/value %) defaultValue))
+                         (first)
+                         map->EnumElementDef))
+        elementDefs  (doall (map map->EnumElementDef elementDefs))
+        obj          (EnumDef.)]
+    (set-attribute-type-def-fields obj m)
+    (doto obj
+      (.setDefaultValue defaultValue)
+      (.setElementDefs elementDefs))))
+
+(defn map->AttributeTypeDef [m]
+  (let [category (:openmetadata.AttributeTypeDef/category m)]
+    (case category
+      "PRIMITIVE" (map->PrimitiveDef m)
+      "COLLECTION" (map->CollectionDef m)
+      "ENUM_DEF" (map->EnumDef m))))
+
+(defn map->TypeDefAttribute [m]
+  (let [{:openmetadata.TypeDefAttribute/keys [attributeName
+                                              attributeType
+                                              attributeStatus
+                                              replacedByAttribute
+                                              attributeDescription
+                                              attributeDescriptionGUID
+                                              cardinality
+                                              valuesMinCount
+                                              valuesMaxCount
+                                              isIndexable
+                                              isUnique
+                                              defaultValue
+                                              externalStandardMappings]} m
+        attributeType            (some-> attributeType
+                                   find-attribute-type-def-by-guid
+                                   map->AttributeTypeDef)
+        attributeStatus          (some-> attributeStatus (TypeDefAttributeStatus/valueOf))
+        cardinality              (some-> cardinality (AttributeCardinality/valueOf))
+        externalStandardMappings (some->> externalStandardMappings (map map->ExternalStandardMapping))
+        ]
+    (doto (TypeDefAttribute.)
+      (.setAttributeName attributeName)
+      (.setAttributeType attributeType)
+      (.setAttributeStatus attributeStatus)
+      (.setReplacedByAttribute replacedByAttribute)
+      (.setAttributeDescription attributeDescription)
+      (.setAttributeDescriptionGUID attributeDescriptionGUID)
+      (.setAttributeCardinality cardinality)
+      (.setValuesMinCount valuesMinCount)
+      (.setValuesMaxCount valuesMaxCount)
+      (.setIndexable isIndexable)
+      (.setUnique isUnique)
+      (.setDefaultValue defaultValue)
+      (.setExternalStandardMappings externalStandardMappings))))
+
+(defn set-type-def-fields [obj m]
+  (let [{:openmetadata.TypeDef/keys [guid
+                                     name
+                                     status
+                                     version
+                                     versionName
+                                     replacedByTypeGUID
+                                     replacedByTypeName
+                                     category
+                                     superType
+                                     description
+                                     descriptionGUID
+                                     origin
+                                     createdBy
+                                     updatedBy
+                                     createTime
+                                     updateTime
+                                     options
+                                     externalStandardMappings
+                                     validInstanceStatusList
+                                     initialStatus
+                                     propertiesDefinition]} m
+        status                   (some-> status (TypeDefStatus/valueOf))
+        category                 (some-> category (TypeDefCategory/valueOf))
+        superType                (when superType
+                                   (->TypeDefLink superType))
+        externalStandardMappings (some->> externalStandardMappings (map map->ExternalStandardMapping))
+        validInstanceStatusList  (some->> validInstanceStatusList (map #(InstanceStatus/valueOf %)))
+        initialStatus            (some-> initialStatus (InstanceStatus/valueOf))
+        propertiesDefinition     (some->> propertiesDefinition (map map->TypeDefAttribute))]
+    (doto obj
+      (.setGUID guid)
+      (.setName name)
+      (.setStatus status)
+      (.setVersion version)
+      (.setVersionName versionName)
+      (.setReplacedByTypeGUID replacedByTypeGUID)
+      (.setReplacedByTypeName replacedByTypeName)
+      (.setCategory category)
+      (.setSuperType superType)
+      (.setDescription description)
+      (.setDescriptionGUID descriptionGUID)
+      (.setOrigin origin)
+      (.setCreatedBy createdBy)
+      (.setCreateTime createTime)
+      (.setUpdatedBy updatedBy)
+      (.setUpdateTime updateTime)
+      (.setOptions options)
+      (.setExternalStandardMappings externalStandardMappings)
+      (.setValidInstanceStatusList validInstanceStatusList)
+      (.setInitialStatus initialStatus)
+      (.setPropertiesDefinition propertiesDefinition))))
+
+(defn map->EntityDef [m]
+  (let [obj (EntityDef.)]
+    (set-type-def-fields obj m)))
+
+(defn map->RelationshipDef [m]
+  (let [{:openmetadata.RelationshipDef/keys [propagationRule
+                                             endDef1EntityType
+                                             endDef1AttributeName
+                                             endDef1AttributeDescription
+                                             endDef1AttributeDescriptionGUID
+                                             endDef1AttributeCardinality
+                                             endDef2EntityType
+                                             endDef2AttributeName
+                                             endDef2AttributeDescription
+                                             endDef2AttributeDescriptionGUID
+                                             endDef2AttributeCardinality]} m
+        endDef1AttributeCardinality (some-> endDef1AttributeCardinality (RelationshipEndCardinality/valueOf))
+        endDef1TypeDefLink          (->TypeDefLink endDef1EntityType)
+        endDef2AttributeCardinality (some-> endDef2AttributeCardinality (RelationshipEndCardinality/valueOf))
+        endDef2TypeDefLink          (->TypeDefLink endDef2EntityType)
+        endDef1                     (doto (RelationshipEndDef.)
+                                      (.setEntityType endDef1TypeDefLink)
+                                      (.setAttributeName endDef1AttributeName)
+                                      (.setAttributeDescription endDef1AttributeDescription)
+                                      (.setAttributeDescriptionGUID endDef1AttributeDescriptionGUID)
+                                      (.setAttributeCardinality endDef1AttributeCardinality))
+        endDef2                     (doto (RelationshipEndDef.)
+                                      (.setEntityType endDef2TypeDefLink)
+                                      (.setAttributeName endDef2AttributeName)
+                                      (.setAttributeDescription endDef2AttributeDescription)
+                                      (.setAttributeDescriptionGUID endDef2AttributeDescriptionGUID)
+                                      (.setAttributeCardinality endDef2AttributeCardinality))
+        propagationRule             (some-> propagationRule (ClassificationPropagationRule/valueOf))
+        obj                         (RelationshipDef.)]
+    (set-type-def-fields obj m)
+    (doto obj
+      (.setEndDef1 endDef1)
+      (.setEndDef2 endDef2)
+      (.setPropagationRule propagationRule))))
+
+(defn map->ClassificationDef [m]
+  (let [{:openmetadata.ClassificationDef/keys [validEntityDefs
+                                               propagatable]} m
+        validEntityDefs (->> validEntityDefs
+                          (map ->TypeDefLink))
+        obj             (ClassificationDef.)]
+    (set-type-def-fields obj m)
+    (doto obj
+      (.setValidEntityDefs validEntityDefs)
+      (.setPropagatable propagatable))))
+
+(defn map->TypeDef [m]
+  (let [category (:openmetadata.TypeDef/category m)]
+    (case category
+      "ENTITY_DEF" (map->EntityDef m)
+      "RELATIONSHIP_DEF" (map->RelationshipDef m)
+      "CLASSIFICATION_DEF" (map->ClassificationDef m))))
 
 (defn map->InstanceType [type-def]
   (doto (InstanceType.)

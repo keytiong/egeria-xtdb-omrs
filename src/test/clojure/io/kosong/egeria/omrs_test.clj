@@ -1,90 +1,161 @@
 (ns io.kosong.egeria.omrs-test
   (:use [midje.sweet])
   (:require [io.kosong.egeria.omrs :as omrs]
-            [clojure.datafy]
+            [clojure.datafy :refer [datafy]]
             [clojure.java.io :as io]
             [clojure.edn :as edn]
-            [clojure.string :as str])
-  (:import (org.odpi.openmetadata.repositoryservices.connectors.stores.metadatacollectionstore.properties.instances EntityDetail InstanceProperties PrimitivePropertyValue)
-           (org.odpi.openmetadata.repositoryservices.connectors.stores.metadatacollectionstore.properties.typedefs PrimitiveDefCategory)))
+            [clojure.string :as str]))
 
-(defn- new-repo-helper []
-  (let [user-id               "test-user"
-        server-name           "my-server-name"
-        server-type           "my-server-type"
-        organization          "my-organization"
-        component-id          0
-        component-name        "my-component-name"
-        component-description "my-component-description"
-        component-wiki-url    "my-component-wiki-url"
-        audit-log-store       (omrs/->audit-log-store)
-        audit-log-destination (omrs/->audit-log-destination
-                                {:audit-log-stores [audit-log-store]
+(def server-name "omrs-test-server")
+(def server-type "Open Metadata Repository Service")
+(def organization "kosong.io")
+(def user-id "garygeeke")
+(def component-id 1001)
+(def component-name "Egeria XTDB Open Metadata Repository Service")
+(def component-description "Egeria XTDB Open Metadata Repository Service")
+(def component-wiki-url "https://github.com/keytiong")
+
+(def audit-log-store
+  (omrs/->null-audit-log-store))
+
+(def audit-log-destination
+  (omrs/->audit-log-destination {:audit-log-stores [audit-log-store]
                                  :server-name      server-name
                                  :server-type      server-type
-                                 :organization     organization})
-        audit-log             (omrs/->audit-log
-                                {:audit-log-destination audit-log-destination
-                                 :component-id          component-id
-                                 :component-name        component-name
-                                 :component-description component-description
-                                 :component-wiki-url    component-wiki-url})
-        archive-type-store    (omrs/->openmetadata-archive)
-        content-manager       (omrs/->repository-content-manager
-                                {:user-id   user-id
-                                 :audit-log audit-log
-                                 :archive   archive-type-store})
-        repo-helper           (omrs/->repository-helper
-                                {:content-manager content-manager})]
-    repo-helper))
+                                 :organization     organization}))
 
-(def ^:dynamic *repo-helper* (new-repo-helper))
+(def audit-log
+  (omrs/->audit-log {:audit-log-destination audit-log-destination
+                     :component-id          component-id
+                     :component-name        component-name
+                     :component-description component-description
+                     :component-wiki-url    component-wiki-url}))
 
-(let [^EntityDetail entity-detail (binding [omrs/*repo-helper* *repo-helper*]
-                                    (omrs/->EntityDetail "repl" "1234" "alice" "CSVFile"))
-      csv-file                    (binding [omrs/*repo-helper* *repo-helper*]
-                                    (clojure.datafy/datafy entity-detail))]
-  (fact "EntityDetail object"
-    entity-detail =not=> nil?)
-  (fact "EntityDetail type def name"
-    (-> entity-detail (.getType) (.getTypeDefName)) => "CSVFile"))
+(def openmetadata-types-archive
+  (omrs/->openmetadata-types-archive))
 
-(facts "Create InstanceProperties object from map"
-  (let [^InstanceProperties obj (binding [omrs/*repo-helper* *repo-helper*]
-                                  (omrs/->InstanceProperties "CSVFile"
-                                    {:name                 "Week 1: Drop Foot Clinical Trial Measurements"
-                                     :description          "One week's data covering foot angle, hip displacement and mobility measurements."
-                                     :qualifiedName        "file://secured/research/clinical-trials/drop-foot/DropFootMeasurementsWeek1.csv"
-                                     :fileType             "csv"
-                                     :ownerType            "UserId"
-                                     :additionalProperties {"a" "1"
-                                                            "b" "2"}}))]
-    (fact "should have expected property count"
-      (some-> (.getPropertyCount obj) => 15))
-    (fact "name property should have primitive string category"
-      (some-> (.getPropertyValue obj "name") (.getPrimitiveDefCategory)) => PrimitiveDefCategory/OM_PRIMITIVE_TYPE_STRING)
-    (fact "property name value"
-      (some-> (.getPropertyValue obj "name") (.valueAsObject)) => "Week 1: Drop Foot Clinical Trial Measurements")))
+(def repo-content-manager
+  (omrs/->repository-content-manager {:user-id   user-id
+                                      :audit-log audit-log}))
 
-(facts "Build EntityDetail from Clojure map"
-  (let [iris-data (-> (io/resource "DataSet/iris.edn")
-                    (slurp)
-                    (edn/read-string))
-        entity-detail (binding [omrs/*repo-helper* *repo-helper*]
-                        (omrs/map->EntityDetail iris-data))]
-    (fact "instance guid"
-      (.getGUID entity-detail) =>
-      "9bfbf0ca-3fb0-4980-a8b2-be903da4d1cf")
-    (fact "type def guid"
-      (some-> entity-detail (.getType) (.getTypeDefGUID)) =>
-      "1449911c-4f44-4c22-abc0-7540154feefb")
-    (fact "type def name"
-      (some-> entity-detail (.getType) (.getTypeDefName)) =>
-      "DataSet")
-    (fact "data set name"
-      (some-> entity-detail (.getProperties) (.getPropertyValue "name") (.valueAsObject)) =>
-      "Iris Plants Database")
-    (fact "data set description"
-      (some-> entity-detail (.getProperties) (.getPropertyValue "description") (.valueAsObject)) =>
-      #(str/starts-with? % "Multivariate data set"))))
+(def repo-helper
+  (omrs/->repository-helper {:content-manager repo-content-manager}))
+
+(omrs/set-repo-helper! repo-helper)
+
+(omrs/init-repo-content-manager repo-content-manager openmetadata-types-archive user-id)
+
+
+(defn list-attribute-type-defs [openmetadata-types-archive]
+  (let [archive-store (.getArchiveTypeStore openmetadata-types-archive)]
+    (.getAttributeTypeDefs archive-store)))
+
+(defn attribute-type-def-by-name [openmetadata-types-archive name]
+  (->> (list-attribute-type-defs openmetadata-types-archive)
+    (filter #(= (.getName %) name))
+    (first)))
+
+(defn list-type-defs [openmetadata-types-archive]
+  (let [archive-store (.getArchiveTypeStore openmetadata-types-archive)]
+    (.getNewTypeDefs archive-store)))
+
+(defn type-def-by-name [openmetadata-types-archive name]
+  (->> (list-type-defs openmetadata-types-archive)
+    (filter #(= (.getName %) name))
+    (first)))
+
+;;
+;; Attribute Type Defs
+;;
+(def primitive-string-def
+  (attribute-type-def-by-name openmetadata-types-archive "string"))
+
+(def string-string-map-def
+  (attribute-type-def-by-name openmetadata-types-archive "map<string,string>"))
+
+(def string-long-map-def
+  (attribute-type-def-by-name openmetadata-types-archive "map<string,long>"))
+
+(def order-by-enum-def
+  (attribute-type-def-by-name openmetadata-types-archive "OrderBy"))
+
+;;
+;; Entity Def
+;;
+
+(def referenceable-type-def
+  (type-def-by-name openmetadata-types-archive "Referenceable"))
+
+(def asset-type-def
+  (type-def-by-name openmetadata-types-archive "Asset"))
+
+;;
+;; Relationship Def
+;;
+
+(def foreign-key-type-def
+  (type-def-by-name openmetadata-types-archive "ForeignKey"))
+
+;;
+;; Classification Def
+;;
+
+(def anchors-type-def
+  (type-def-by-name openmetadata-types-archive "Anchors"))
+
+
+(facts "Datafy PrimitiveDef"
+  (let [datafied (clojure.datafy/datafy primitive-string-def)]
+    (fact "attribute type def name"
+      (:openmetadata.AttributeTypeDef/name datafied) => "string")
+    (fact "attribute type def category"
+      (:openmetadata.AttributeTypeDef/category datafied)
+      => "PRIMITIVE")
+    (fact "attribute type def guid"
+      (:openmetadata.AttributeTypeDef/guid datafied)
+      => "b34a64b9-554a-42b1-8f8a-7d5c2339f9c4")
+    (fact "attribute type def version"
+      (:openmetadata.AttributeTypeDef/version datafied)
+      => 1)
+    (fact "attribute type def version name"
+      (:openmetadata.AttributeTypeDef/versionName datafied)
+      => "1.0")
+    (fact "Primitive Def Category"
+      (:openmetadata.PrimitiveDef/primitiveDefCategory datafied)
+      => "OM_PRIMITIVE_TYPE_STRING")))
+
+(facts "Round trip AttributeTypeDef -> map -> AttributeTypeDef"
+  (fact "primitive string"
+    (-> primitive-string-def clojure.datafy/datafy omrs/map->AttributeTypeDef)
+    => primitive-string-def)
+
+  (fact "map<string,string> data"
+    (-> string-string-map-def clojure.datafy/datafy omrs/map->AttributeTypeDef)
+    => string-string-map-def)
+
+  (fact "map<string,map>"
+    (-> string-long-map-def clojure.datafy/datafy omrs/map->AttributeTypeDef)
+    => string-long-map-def)
+
+  (fact "enum"
+    (-> order-by-enum-def clojure.datafy/datafy omrs/map->AttributeTypeDef)
+    => order-by-enum-def))
+
+(facts "Round trip TypeDef -> map -> TypeDef"
+  (fact "top level entity def"
+    (-> referenceable-type-def clojure.datafy/datafy omrs/map->TypeDef)
+    => referenceable-type-def)
+  (fact "subtype entity def"
+    (-> asset-type-def clojure.datafy/datafy omrs/map->TypeDef)
+    => asset-type-def))
+
+(facts "Round trip TypeDef -> map -> TypeDef"
+  (fact "relationship def"
+    (-> foreign-key-type-def clojure.datafy/datafy omrs/map->TypeDef)
+    => foreign-key-type-def))
+
+(facts "Round trip TypeDef -> map -> TypeDef"
+  (fact "classification def"
+    (-> anchors-type-def clojure.datafy/datafy omrs/map->TypeDef)
+    => anchors-type-def))
 
