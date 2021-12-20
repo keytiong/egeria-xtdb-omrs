@@ -104,7 +104,7 @@
 
 
 (defn- entity-exist? [xtdb-node repo-helper entity-doc]
-  (let [type-def-guid    (:openmetadata.Entity/typeDefGUID entity-doc)
+  (let [type-def-guid    (:openmetadata.Entity/type entity-doc)
         type-def         (omrs/find-type-def-by-guid repo-helper type-def-guid)
         unique-attrs     (unique-type-def-attributes repo-helper type-def)
         unique-prop-keys (conj (map omrs/qualify-property-key unique-attrs)
@@ -122,7 +122,7 @@
 
 (defn- verify-unique-constraints [xtdb-node repo-helper new-entity]
   (let [entity-guid      (:openmetadata.Entity/guid new-entity)
-        type-def-guid    (:openmetadata.Entity/typeDefGUID new-entity)
+        type-def-guid    (:openmetadata.Entity/type new-entity)
         type-def         (omrs/find-type-def-by-guid repo-helper type-def-guid)
         unique-props     (unique-type-def-attributes repo-helper type-def)
         unique-prop-keys (map omrs/qualify-property-key unique-props)
@@ -262,9 +262,9 @@
         db               (xt/db xtdb-node)
         relationship-doc (find-relationship-instance db guid)
         entity-one-guid  (when relationship-doc
-                           (:openmetadata.Relationship/entityOneGUID relationship-doc))
+                           (:openmetadata.Relationship/entityOne relationship-doc))
         entity-two-guid  (when relationship-doc
-                           (:openmetadata.Relationship/entityTwoGUID relationship-doc))
+                           (:openmetadata.Relationship/entityTwo relationship-doc))
         entity-one-doc   (when entity-one-guid
                            (find-entity-instance db entity-one-guid))
         entity-two-doc   (when entity-two-guid
@@ -304,13 +304,13 @@
         q         '{:find  [(eql/project ?r [*])]
                     :in    [guid]
                     :where [(or
-                              [?r :openmetadata.Relationship/entityOneGUID guid]
-                              [?r :openmetadata.Relationship/entityTwoGUID guid])]}]
+                              [?r :openmetadata.Relationship/entityOne guid]
+                              [?r :openmetadata.Relationship/entityTwo guid])]}]
     (->> (xt/q db q entityGUID)
       (map first)
       (map (fn [r]
-             (let [e1-guid (:openmetadata.Relationship/entityOneGUID r)
-                   e2-guid (:openmetadata.Relationship/entityTwoGUID r)
+             (let [e1-guid (:openmetadata.Relationship/entityOne r)
+                   e2-guid (:openmetadata.Relationship/entityTwo r)
                    e1      (find-entity-instance db e1-guid)
                    e2      (find-entity-instance db e2-guid)]
                [r e1 e2])))

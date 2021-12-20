@@ -244,26 +244,26 @@
         property-keys (list-type-def-property-keys inst-type-def)]
     (reduce (partial collect-instance-map instance-props) {} property-keys)))
 
-(defn Classification->map
-  [^Classification classification]
-  (let [instance-props (or (.getProperties classification) (InstanceProperties.))
-        type-guid      (some-> (.getType classification) (.getTypeDefGUID))]
-    (merge
-      #:openmetadata.Classification
-          {:typeDefGUID          (some-> (.getType classification) (.getTypeDefGUID))
-           :typeDefName          (some-> (.getType classification) (.getTypeDefName))
-           :name                 (.getName classification)
-           :origin               (some-> (.getClassificationOrigin classification) (.name))
-           :originGUID           (.getClassificationOriginGUID classification)
-           :metadataCollectionId (.getMetadataCollectionId classification)
-           :createdBy            (.getCreatedBy classification)
-           :updatedBy            (.getUpdatedBy classification)
-           :createTime           (.getCreateTime classification)
-           :updateTime           (.getUpdateTime classification)
-           :version              (.getVersion classification)
-           :status               (some-> (.getStatus classification) (.name))
-           :statusOnDelete       (some-> (.getStatusOnDelete classification) (.name))}
-      (InstanceProperties->map type-guid instance-props))))
+(extend-type Classification
+  p/Datafiable
+  (datafy [^Classification classification]
+    (let [instance-props (or (.getProperties classification) (InstanceProperties.))
+          type-guid      (some-> (.getType classification) (.getTypeDefGUID))]
+      (merge
+        #:openmetadata.Classification
+            {:type                 (some-> (.getType classification) (.getTypeDefGUID))
+             :name                 (.getName classification)
+             :origin               (some-> (.getClassificationOrigin classification) (.name))
+             :originGUID           (.getClassificationOriginGUID classification)
+             :metadataCollectionId (.getMetadataCollectionId classification)
+             :createdBy            (.getCreatedBy classification)
+             :updatedBy            (.getUpdatedBy classification)
+             :createTime           (.getCreateTime classification)
+             :updateTime           (.getUpdateTime classification)
+             :version              (.getVersion classification)
+             :status               (some-> (.getStatus classification) (.name))
+             :statusOnDelete       (some-> (.getStatusOnDelete classification) (.name))}
+        (InstanceProperties->map type-guid instance-props)))))
 
 (extend-type EntityDetail
   p/Datafiable
@@ -273,10 +273,9 @@
       (merge
         #:openmetadata.Entity
             {:guid                 (.getGUID entity-detail)
-             :typeDefGUID          (some-> (.getType entity-detail) (.getTypeDefGUID))
-             :typeDefName          (some-> (.getType entity-detail) (.getTypeDefName))
+             :type                 (some-> (.getType entity-detail) (.getTypeDefGUID))
              :instanceURL          (.getInstanceURL entity-detail)
-             :classifications      (some->> (.getClassifications entity-detail) (mapv Classification->map))
+             :classifications      (some->> (.getClassifications entity-detail) (mapv datafy))
              :metadataCollectionId (.getMetadataCollectionId entity-detail)
              :createdBy            (.getCreatedBy entity-detail)
              :updatedBy            (.getUpdatedBy entity-detail)
@@ -296,10 +295,9 @@
         #:openmetadata.Entity
             {:guid                 (.getGUID entity-proxy)
              :isProxy              true
-             :typeDefGUID          (some-> (.getType entity-proxy) (.getTypeDefGUID))
-             :typeDefName          (some-> (.getType entity-proxy) (.getTypeDefName))
+             :type                 (some-> (.getType entity-proxy) (.getTypeDefGUID))
              :instanceURL          (.getInstanceURL entity-proxy)
-             :classifications      (some->> (.getClassifications entity-proxy) (mapv Classification->map))
+             :classifications      (some->> (.getClassifications entity-proxy) (mapv datafy))
              :metadataCollectionId (.getMetadataCollectionId entity-proxy)
              :createdBy            (.getCreatedBy entity-proxy)
              :updatedBy            (.getUpdatedBy entity-proxy)
@@ -318,10 +316,9 @@
       (merge
         #:openmetadata.Relationship
             {:guid                 (.getGUID relationship)
-             :typeDefGUID          (some-> (.getType relationship) (.getTypeDefGUID))
-             :typeDefName          (some-> (.getType relationship) (.getTypeDefName))
-             :entityOneGUID        (some-> (.getEntityOneProxy relationship) (.getGUID))
-             :entityTwoGUID        (some-> (.getEntityTwoProxy relationship) (.getGUID))
+             :type                 (some-> (.getType relationship) (.getTypeDefGUID))
+             :entityOne            (some-> (.getEntityOneProxy relationship) (.getGUID))
+             :entityTwo            (some-> (.getEntityTwoProxy relationship) (.getGUID))
              :metadataCollectionId (.getMetadataCollectionId relationship)
              :createdBy            (.getCreatedBy relationship)
              :updatedBy            (.getUpdatedBy relationship)
@@ -827,8 +824,7 @@
          [name
           origin
           originGUID
-          typeDefGUID
-          typeDefName
+          type
           instanceProvenanceType
           metadataCollectionName
           metadataCollectionId
@@ -843,9 +839,8 @@
           status
           statusOnDelete
           mappingProperties]} m
-        type-def       (if typeDefGUID
-                         (find-type-def-by-guid typeDefGUID)
-                         (find-type-def-by-name typeDefName))
+        type-def       (when type
+                         (find-type-def-by-guid type))
         inst-type      (map->InstanceType type-def)
         inst-prov-type (or (some-> instanceProvenanceType (InstanceProvenanceType/valueOf))
                          InstanceProvenanceType/UNKNOWN)
@@ -875,8 +870,7 @@
 (defn map->EntityDetail [m]
   (let [{:openmetadata.Entity/keys
          [guid
-          typeDefGUID
-          typeDefName
+          type
           instanceProvenanceType
           instanceURL
           metadataCollectionName
@@ -893,43 +887,42 @@
           statusOnDelete
           mappingProperties
           classifications]} m
-        type-def       (if typeDefGUID
-                         (find-type-def-by-guid typeDefGUID)
-                         (find-type-def-by-name typeDefName))
-        inst-type      (map->InstanceType type-def)
-        inst-prov-type (or (some-> instanceProvenanceType (InstanceProvenanceType/valueOf))
-                         InstanceProvenanceType/UNKNOWN)
-        guid           (or guid (str (UUID/randomUUID)))
-        inst-props     (map->InstanceProperties type-def m)
-        cls            (->> (or classifications [])
-                         (map #(map->Classification %)))]
+        type-def               (when type
+                                 (find-type-def-by-guid type))
+        inst-type              (map->InstanceType type-def)
+        instanceProvenanceType (or (some-> instanceProvenanceType (InstanceProvenanceType/valueOf))
+                                 InstanceProvenanceType/UNKNOWN)
+        status                 (some-> status (InstanceStatus/valueOf))
+        statusOnDelete         (some-> statusOnDelete (InstanceStatus/valueOf))
+        guid                   (or guid (str (UUID/randomUUID)))
+        instance-properties    (map->InstanceProperties type-def m)
+        classifications        (map #(map->Classification %) classifications)]
     (doto (EntityDetail.)
       (.setGUID guid)
       (.setType inst-type)
-      (.setInstanceProvenanceType inst-prov-type)
+      (.setInstanceProvenanceType instanceProvenanceType)
       (.setInstanceURL instanceURL)
-      (.setProperties inst-props)
+      (.setProperties instance-properties)
       (.setMetadataCollectionId metadataCollectionId)
       (.setMetadataCollectionName metadataCollectionName)
-      (.setVersion (or version 1))
-      (.setMaintainedBy (some-> maintainedBy (LinkedList.)))
+      (.setVersion version)
+      (.setMaintainedBy maintainedBy)
       (.setReplicatedBy replicatedBy)
       (.setInstanceLicense instanceLicense)
       (.setCreatedBy createdBy)
       (.setUpdatedBy updatedBy)
       (.setCreateTime createTime)
       (.setUpdateTime updateTime)
-      (.setStatus (some-> status (InstanceStatus/valueOf)))
-      (.setStatusOnDelete (some-> statusOnDelete (InstanceStatus/valueOf)))
+      (.setStatus status)
+      (.setStatusOnDelete statusOnDelete)
       (.setMappingProperties mappingProperties)
-      (.setClassifications (LinkedList. cls)))))
+      (.setClassifications classifications))))
 
 
 (defn map->EntitySummary [m]
   (let [{:openmetadata.Entity/keys
          [guid
-          typeDefGUID
-          typeDefName
+          type
           instanceProvenanceType
           instanceURL
           metadataCollectionName
@@ -946,41 +939,39 @@
           statusOnDelete
           mappingProperties
           classifications]} m
-        type-def       (if typeDefGUID
-                         (find-type-def-by-guid typeDefGUID)
-                         (find-type-def-by-name typeDefName))
-        inst-type      (map->InstanceType type-def)
-        inst-prov-type (or (some-> instanceProvenanceType (InstanceProvenanceType/valueOf))
-                         InstanceProvenanceType/UNKNOWN)
-        guid           (or guid (str (UUID/randomUUID)))
-        cls            (->> (or classifications [])
-                         (map #(map->Classification %)))]
+        type-def               (when type
+                                 (find-type-def-by-guid type))
+        instance-type          (map->InstanceType type-def)
+        status                 (some-> status (InstanceStatus/valueOf))
+        statusOnDelete         (some-> statusOnDelete (InstanceStatus/valueOf))
+        instanceProvenanceType (some-> instanceProvenanceType (InstanceProvenanceType/valueOf))
+
+        classifications        (map #(map->Classification %) classifications)]
     (doto (EntitySummary.)
       (.setGUID guid)
-      (.setType inst-type)
-      (.setInstanceProvenanceType inst-prov-type)
+      (.setType instance-type)
+      (.setInstanceProvenanceType instanceProvenanceType)
       (.setInstanceURL instanceURL)
       (.setMetadataCollectionId metadataCollectionId)
       (.setMetadataCollectionName metadataCollectionName)
-      (.setVersion (or version 1))
-      (.setMaintainedBy (some-> maintainedBy (LinkedList.)))
+      (.setVersion version)
+      (.setMaintainedBy maintainedBy)
       (.setReplicatedBy replicatedBy)
       (.setInstanceLicense instanceLicense)
       (.setCreatedBy createdBy)
       (.setUpdatedBy updatedBy)
       (.setCreateTime createTime)
       (.setUpdateTime updateTime)
-      (.setStatus (some-> status (InstanceStatus/valueOf)))
-      (.setStatusOnDelete (some-> statusOnDelete (InstanceStatus/valueOf)))
+      (.setStatus status)
+      (.setStatusOnDelete statusOnDelete)
       (.setMappingProperties mappingProperties)
-      (.setClassifications (LinkedList. cls)))))
+      (.setClassifications (LinkedList. classifications)))))
 
 
 (defn map->EntityProxy [m]
   (let [{:openmetadata.Entity/keys
          [guid
-          typeDefGUID
-          typeDefName
+          type
           instanceProvenanceType
           instanceURL
           metadataCollectionName
@@ -997,43 +988,40 @@
           statusOnDelete
           mappingProperties
           classifications]} m
-        type-def       (if typeDefGUID
-                         (find-type-def-by-guid typeDefGUID)
-                         (find-type-def-by-name typeDefName))
-        inst-type      (map->InstanceType type-def)
-        inst-prov-type (or (some-> instanceProvenanceType (InstanceProvenanceType/valueOf))
-                         InstanceProvenanceType/UNKNOWN)
-        guid           (or guid (str (UUID/randomUUID)))
-        inst-props     (map->InstanceProperties type-def m)
-        cls            (->> (or classifications [])
-                         (map #(map->Classification %)))]
+        type-def               (when type
+                                 (find-type-def-by-guid type))
+        inst-type              (map->InstanceType type-def)
+        instanceProvenanceType (some-> instanceProvenanceType (InstanceProvenanceType/valueOf))
+        inst-props             (map->InstanceProperties type-def m)
+        status                 (some-> status (InstanceStatus/valueOf))
+        statusOnDelete         (some-> statusOnDelete (InstanceStatus/valueOf))
+        classifications        (map #(map->Classification %) classifications)]
     (doto (EntityProxy.)
       (.setGUID guid)
       (.setType inst-type)
-      (.setInstanceProvenanceType inst-prov-type)
+      (.setInstanceProvenanceType instanceProvenanceType)
       (.setInstanceURL instanceURL)
       (.setUniqueProperties inst-props)
       (.setMetadataCollectionId metadataCollectionId)
       (.setMetadataCollectionName metadataCollectionName)
-      (.setVersion (or version 1))
-      (.setMaintainedBy (some-> maintainedBy (LinkedList.)))
+      (.setVersion version)
+      (.setMaintainedBy maintainedBy)
       (.setReplicatedBy replicatedBy)
       (.setInstanceLicense instanceLicense)
       (.setCreatedBy createdBy)
       (.setUpdatedBy updatedBy)
       (.setCreateTime createTime)
       (.setUpdateTime updateTime)
-      (.setStatus (some-> status (InstanceStatus/valueOf)))
-      (.setStatusOnDelete (some-> statusOnDelete (InstanceStatus/valueOf)))
+      (.setStatus status)
+      (.setStatusOnDelete statusOnDelete)
       (.setMappingProperties mappingProperties)
-      (.setClassifications (LinkedList. cls)))))
+      (.setClassifications classifications))))
 
 
 (defn map->Relationship [r e1 e2]
   (let [{:openmetadata.Relationship/keys
          [guid
-          typeDefGUID
-          typeDefName
+          type
           instanceProvenanceType
           instanceURL
           metadataCollectionName
@@ -1049,36 +1037,35 @@
           status
           statusOnDelete
           mappingProperties
-          entityOneGUID
-          entityTwoGUID]} r
-        type-def         (if typeDefGUID
-                           (find-type-def-by-guid typeDefGUID)
-                           (find-type-def-by-name typeDefName))
-        inst-type        (map->InstanceType type-def)
-        inst-prov-type   (or (some-> instanceProvenanceType (InstanceProvenanceType/valueOf))
-                           InstanceProvenanceType/UNKNOWN)
-        guid             (or guid (str (UUID/randomUUID)))
-        inst-props       (map->InstanceProperties type-def r)
-        entity-proxy-one (map->EntityProxy e1)
-        entity-proxy-two (map->EntityProxy e2)]
+          entityOne
+          entityTwo]} r
+        type-def               (when type
+                                 (find-type-def-by-guid type))
+        inst-type              (map->InstanceType type-def)
+        instanceProvenanceType (some-> instanceProvenanceType (InstanceProvenanceType/valueOf))
+        instance-properties    (map->InstanceProperties type-def r)
+        status                 (some-> status (InstanceStatus/valueOf))
+        statusOnDelete         (some-> statusOnDelete (InstanceStatus/valueOf))
+        entity-proxy-one       (map->EntityProxy e1)
+        entity-proxy-two       (map->EntityProxy e2)]
     (doto (Relationship.)
       (.setGUID guid)
       (.setType inst-type)
-      (.setInstanceProvenanceType inst-prov-type)
+      (.setInstanceProvenanceType instanceProvenanceType)
       (.setInstanceURL instanceURL)
-      (.setProperties inst-props)
+      (.setProperties instance-properties)
       (.setMetadataCollectionId metadataCollectionId)
       (.setMetadataCollectionName metadataCollectionName)
-      (.setVersion (or version 1))
-      (.setMaintainedBy (some-> maintainedBy (LinkedList.)))
+      (.setVersion version)
+      (.setMaintainedBy maintainedBy)
       (.setReplicatedBy replicatedBy)
       (.setInstanceLicense instanceLicense)
       (.setCreatedBy createdBy)
       (.setUpdatedBy updatedBy)
       (.setCreateTime createTime)
       (.setUpdateTime updateTime)
-      (.setStatus (some-> status (InstanceStatus/valueOf)))
-      (.setStatusOnDelete (some-> statusOnDelete (InstanceStatus/valueOf)))
+      (.setStatus status)
+      (.setStatusOnDelete statusOnDelete)
       (.setMappingProperties mappingProperties)
       (.setEntityOneProxy entity-proxy-one)
       (.setEntityTwoProxy entity-proxy-two))))
