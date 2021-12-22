@@ -23,7 +23,7 @@
    (find-type-def-by-guid *repo-helper* type-def-guid))
   ([^OMRSRepositoryContentHelper repo-helper type-def-guid]
    (if-let [type-def (.getTypeDef repo-helper "omrs" "guid" type-def-guid "find-type-def-by-guid")]
-     (p/datafy type-def))))
+     (datafy type-def))))
 
 (defn find-type-def-by-name
   ([type-def-name]
@@ -199,39 +199,6 @@
          (.setProperty obj (name k) property-value)))
      obj)))
 
-(extend-type PrimitivePropertyValue
-  p/Datafiable
-  (datafy [^PrimitivePropertyValue x]
-    (p/datafy (.valueAsObject x))))
-
-(extend-type ArrayPropertyValue
-  p/Datafiable
-  (datafy [^ArrayPropertyValue x]
-    (when (> (.getArrayCount x) 0)
-      (some->> (.getArrayValues x)
-        (.getInstanceProperties)
-        (sort (fn [[k1 _] [k2 _]]
-                (< (Integer/valueOf k1) (Integer/valueOf k2))))
-        (mapv second)
-        datafy
-        (into [])))))
-
-(extend-type MapPropertyValue
-  p/Datafiable
-  (datafy [^MapPropertyValue x]
-    (when-let [instance-props (some-> (.getMapValues x) (.getInstanceProperties))]
-      (reduce
-        (fn [m [k pv]]
-          (assoc m k (datafy pv)))
-        {}
-        instance-props))))
-
-(extend-type EnumPropertyValue
-  p/Datafiable
-  (datafy [^EnumPropertyValue x]
-    (when x
-      (.getSymbolicName x))))
-
 (defn- collect-instance-map [instance-props m qualified-key]
   (let [k  (name qualified-key)
         pv (.getPropertyValue instance-props k)
@@ -329,42 +296,8 @@
              :statusOnDelete       (some-> (.getStatusOnDelete relationship) (.name))}
         (InstanceProperties->map type-guid instance-props)))))
 
-(defn TypeDef->map
-  [^TypeDef obj]
-  #:openmetadata.TypeDef
-      {:guid                     (.getGUID obj)
-       :name                     (.getName obj)
-       :status                   (some-> (.getStatus obj) (.name))
-       :version                  (.getVersion obj)
-       :versionName              (.getVersionName obj)
-       :category                 (some-> (.getCategory obj) (.name))
-       :superType                (some-> (.getSuperType obj) (.getGUID))
-       :description              (.getDescription obj)
-       :descriptionGUID          (.getDescriptionGUID obj)
-       :origin                   (.getOrigin obj)
-       :createdBy                (.getCreatedBy obj)
-       :updatedBy                (.getUpdatedBy obj)
-       :createTime               (.getCreateTime obj)
-       :updateTime               (.getUpdateTime obj)
-       :options                  (some-> (.getOptions obj))
-       :externalStandardMappings (some->> (.getExternalStandardMappings obj)
-                                   (mapv datafy))
-       :validInstanceStatusList  (some->> (.getValidInstanceStatusList obj)
-                                   (mapv #(.name %)))
-       :initialStatus            (some-> (.getInitialStatus obj) (.name))
-       :propertiesDefinition     (some->> (.getPropertiesDefinition obj)
-                                   (mapv datafy))})
 
-(defn AttributeTypeDef->map
-  [^AttributeTypeDef obj]
-  #:openmetadata.AttributeTypeDef
-      {:version         (.getVersion obj)
-       :versionName     (.getVersionName obj)
-       :category        (some-> (.getCategory obj) (.name))
-       :guid            (.getGUID obj)
-       :name            (.getName obj)
-       :description     (.getDescription obj)
-       :descriptionGUID (.getDescriptionGUID obj)})
+
 
 (defn ^OpenMetadataArchive ->openmetadata-types-archive
   []
@@ -435,122 +368,7 @@
            audit-log]}]
   (OMRSRepositoryContentManager. user-id audit-log))
 
-(extend-type TypeDef
-  p/Datafiable
-  (datafy [^TypeDef obj]
-    (TypeDef->map obj)))
 
-(extend-type EntityDef
-  p/Datafiable
-  (datafy [^EntityDef obj]
-    (TypeDef->map obj)))
-
-(extend-type RelationshipDef
-  p/Datafiable
-  (datafy [^RelationshipDef obj]
-    (merge (TypeDef->map obj)
-      #:openmetadata.RelationshipDef
-          {:propagationRule                 (some-> (.getPropagationRule obj) (.name))
-
-           :endDef1EntityType               (some-> (.getEndDef1 obj) (.getEntityType) (.getGUID))
-           :endDef1AttributeName            (some-> (.getEndDef1 obj) (.getAttributeName))
-           :endDef1AttributeDescription     (some-> (.getEndDef1 obj) (.getAttributeDescription))
-           :endDef1AttributeDescriptionGUID (some-> (.getEndDef1 obj) (.getAttributeDescriptionGUID))
-           :endDef1AttributeCardinality     (some-> (.getEndDef1 obj) (.getAttributeCardinality) (.name))
-
-           :endDef2EntityType               (some-> (.getEndDef2 obj) (.getEntityType) (.getGUID))
-           :endDef2AttributeName            (some-> (.getEndDef2 obj) (.getAttributeName))
-           :endDef2AttributeDescription     (some-> (.getEndDef2 obj) (.getAttributeDescription))
-           :endDef2AttributeDescriptionGUID (some-> (.getEndDef2 obj) (.getAttributeDescriptionGUID))
-           :endDef2AttributeCardinality     (some-> (.getEndDef2 obj) (.getAttributeCardinality) (.name))})))
-
-(extend-type ClassificationDef
-  p/Datafiable
-  (datafy [^ClassificationDef obj]
-    (merge (TypeDef->map obj)
-      #:openmetadata.ClassificationDef
-          {:validEntityDefs (some->> (.getValidEntityDefs obj)
-                              (mapv #(.getGUID %)))
-           :propagatable    (.isPropagatable obj)})))
-
-(extend-type PrimitiveDefCategory
-  p/Datafiable
-  (datafy [^PrimitiveDefCategory obj]
-    #:openmetadata.PrimitiveDefCategory
-        {:guid          (.getGUID obj)
-         :name          (.getName obj)
-         :ordinal       (.getOrdinal obj)
-         :javaClassName (.getJavaClassName obj)}))
-
-(extend-type PrimitiveDef
-  p/Datafiable
-  (datafy [^PrimitiveDef obj]
-    (merge (AttributeTypeDef->map obj)
-      #:openmetadata.PrimitiveDef
-          {:primitiveDefCategory (some-> (.getPrimitiveDefCategory obj) (.name))})))
-
-(extend-type CollectionDefCategory
-  p/Datafiable
-  (datafy [^CollectionDefCategory obj]
-    #:openmetadata.CollectionDefCategory
-        {:ordinal       (.getOrdinal obj)
-         :name          (.getName obj)
-         :argumentCount (.getArgumentCount obj)
-         :javaClassName (.getJavaClassName obj)}))
-
-(extend-type CollectionDef
-  p/Datafiable
-  (datafy [^CollectionDef obj]
-    (merge (AttributeTypeDef->map obj)
-      #:openmetadata.CollectionDef
-          {:collectionDefCategory (some-> (.getCollectionDefCategory obj) (.name))
-           :argumentCount         (.getArgumentCount obj)
-           :argumentTypes         (some->> (.getArgumentTypes obj)
-                                    (mapv #(.name %)))})))
-
-(extend-type EnumElementDef
-  p/Datafiable
-  (datafy [^EnumElementDef obj]
-    #:openmetadata.EnumElementDef
-        {:ordinal         (.getOrdinal obj)
-         :value           (.getValue obj)
-         :description     (.getDescription obj)
-         :descriptionGUID (.getDescriptionGUID obj)}))
-
-(extend-type EnumDef
-  p/Datafiable
-  (datafy [^EnumDef obj]
-    (merge (AttributeTypeDef->map ^AttributeTypeDef obj)
-      #:openmetadata.EnumDef
-          {:defaultValue (some-> (.getDefaultValue obj) (.getValue))
-           :elementDefs  (some->> (.getElementDefs obj) (mapv datafy))})))
-
-(extend-type TypeDefAttribute
-  p/Datafiable
-  (datafy [^TypeDefAttribute obj]
-    #:openmetadata.TypeDefAttribute
-        {:attributeName            (.getAttributeName obj)
-         :attributeType            (some-> (.getAttributeType obj) (.getGUID))
-         :attributeStatus          (some-> (.getAttributeStatus obj) (.name))
-         :replacedByAttribute      (.getReplacedByAttribute obj)
-         :attributeDescription     (.getAttributeDescription obj)
-         :attributeDescriptionGUID (.getAttributeDescriptionGUID obj)
-         :cardinality              (some-> (.getAttributeCardinality obj) (.name))
-         :valuesMinCount           (.getValuesMinCount obj)
-         :valuesMaxCount           (.getValuesMaxCount obj)
-         :isIndexable              (.isIndexable obj)
-         :isUnique                 (.isUnique obj)
-         :defaultValue             (.getDefaultValue obj)
-         :externalStandardMappings (some->> (.getExternalStandardMappings obj)
-                                     (mapv datafy))}))
-
-(extend-type ExternalStandardMapping
-  p/Datafiable
-  (datafy [^ExternalStandardMapping obj]
-    #:openmetadata.ExternalStandardMapping
-        {:standardName         (.getStandardName obj)
-         :standardOrganization (.getStandardOrganization obj)
-         :standardTypeName     (.getStandardTypeName obj)}))
 
 (defn ->TypeDefLink [guid]
   (let [repo-helper  *repo-helper*

@@ -1,10 +1,8 @@
 (ns io.kosong.egeria.omrs-test
   (:use [midje.sweet])
   (:require [io.kosong.egeria.omrs :as omrs]
-            [clojure.datafy :refer [datafy]]
-            [clojure.java.io :as io]
-            [clojure.edn :as edn]
-            [clojure.string :as str]))
+            [io.kosong.egeria.omrs.datafy :as omrs-datafy]
+            [clojure.datafy :refer [datafy]]))
 
 (def server-name "omrs-test-server")
 (def server-type "Open Metadata Repository Service")
@@ -45,117 +43,100 @@
 
 (omrs/init-repo-content-manager repo-content-manager openmetadata-types-archive user-id)
 
+(defn- attribute-type-def-by-name [name]
+  (.getAttributeTypeDefByName repo-helper "omrs-test" name))
 
-(defn list-attribute-type-defs [openmetadata-types-archive]
-  (let [archive-store (.getArchiveTypeStore openmetadata-types-archive)]
-    (.getAttributeTypeDefs archive-store)))
+(defn- type-def-by-name [name]
+  (.getTypeDefByName repo-helper "omrs-test" name))
 
-(defn attribute-type-def-by-name [openmetadata-types-archive name]
-  (->> (list-attribute-type-defs openmetadata-types-archive)
-    (filter #(= (.getName %) name))
-    (first)))
 
-(defn list-type-defs [openmetadata-types-archive]
-  (let [archive-store (.getArchiveTypeStore openmetadata-types-archive)]
-    (.getNewTypeDefs archive-store)))
-
-(defn type-def-by-name [openmetadata-types-archive name]
-  (->> (list-type-defs openmetadata-types-archive)
-    (filter #(= (.getName %) name))
-    (first)))
+(let [last-attachment-type-def      (type-def-by-name "LastAttachment")
+      type-def-status               (.getStatus last-attachment-type-def)
+      last-attachment-link-type-def (type-def-by-name "LastAttachmentLink")
+      end-def-2                     (.getEndDef2 last-attachment-link-type-def)
+      entity-type                   (.getEntityType end-def-2)]
+  (.setStatus entity-type type-def-status)
+  (.setEntityType end-def-2 entity-type)
+  (.setEndDef2 last-attachment-link-type-def end-def-2))
 
 ;;
 ;; Attribute Type Defs
 ;;
 (def primitive-string-def
-  (attribute-type-def-by-name openmetadata-types-archive "string"))
+  (attribute-type-def-by-name "string"))
 
 (def string-string-map-def
-  (attribute-type-def-by-name openmetadata-types-archive "map<string,string>"))
+  (attribute-type-def-by-name "map<string,string>"))
 
 (def string-long-map-def
-  (attribute-type-def-by-name openmetadata-types-archive "map<string,long>"))
+  (attribute-type-def-by-name "map<string,long>"))
 
 (def order-by-enum-def
-  (attribute-type-def-by-name openmetadata-types-archive "OrderBy"))
+  (attribute-type-def-by-name "OrderBy"))
 
 ;;
 ;; Entity Def
 ;;
 
 (def referenceable-type-def
-  (type-def-by-name openmetadata-types-archive "Referenceable"))
+  (type-def-by-name "Referenceable"))
 
 (def asset-type-def
-  (type-def-by-name openmetadata-types-archive "Asset"))
+  (type-def-by-name "Asset"))
 
 ;;
 ;; Relationship Def
 ;;
 
 (def foreign-key-type-def
-  (type-def-by-name openmetadata-types-archive "ForeignKey"))
+  (type-def-by-name "ForeignKey"))
 
 ;;
 ;; Classification Def
 ;;
 
 (def anchors-type-def
-  (type-def-by-name openmetadata-types-archive "Anchors"))
-
+  (type-def-by-name "Anchors"))
 
 (facts "Datafy PrimitiveDef"
-  (let [datafied (clojure.datafy/datafy primitive-string-def)]
-    (fact "attribute type def name"
-      (:openmetadata.AttributeTypeDef/name datafied) => "string")
-    (fact "attribute type def category"
+  (let [datafied (datafy primitive-string-def)]
+    (fact
+      (:openmetadata.AttributeTypeDef/name datafied)
+      =>
+      "string")
+    (fact
       (:openmetadata.AttributeTypeDef/category datafied)
-      => "PRIMITIVE")
-    (fact "attribute type def guid"
+      =>
+      "PRIMITIVE")
+    (fact
       (:openmetadata.AttributeTypeDef/guid datafied)
-      => "b34a64b9-554a-42b1-8f8a-7d5c2339f9c4")
-    (fact "attribute type def version"
+      =>
+      "b34a64b9-554a-42b1-8f8a-7d5c2339f9c4")
+    (fact
       (:openmetadata.AttributeTypeDef/version datafied)
       => 1)
-    (fact "attribute type def version name"
+    (fact
       (:openmetadata.AttributeTypeDef/versionName datafied)
-      => "1.0")
+      =>
+      "1.0")
     (fact "Primitive Def Category"
       (:openmetadata.PrimitiveDef/primitiveDefCategory datafied)
-      => "OM_PRIMITIVE_TYPE_STRING")))
+      =>
+      "OM_PRIMITIVE_TYPE_STRING")))
 
-(facts "Round trip AttributeTypeDef -> map -> AttributeTypeDef"
-  (fact "primitive string"
-    (-> primitive-string-def clojure.datafy/datafy omrs/map->AttributeTypeDef)
-    => primitive-string-def)
+(doseq [type-def (.getKnownTypeDefs repo-helper)]
+  (fact
+    (-> type-def
+      datafy
+      omrs-datafy/map->TypeDef)
+    =>
+    type-def))
 
-  (fact "map<string,string> data"
-    (-> string-string-map-def clojure.datafy/datafy omrs/map->AttributeTypeDef)
-    => string-string-map-def)
-
-  (fact "map<string,map>"
-    (-> string-long-map-def clojure.datafy/datafy omrs/map->AttributeTypeDef)
-    => string-long-map-def)
-
-  (fact "enum"
-    (-> order-by-enum-def clojure.datafy/datafy omrs/map->AttributeTypeDef)
-    => order-by-enum-def))
-
-(facts "Round trip TypeDef -> map -> TypeDef"
-  (fact "top level entity def"
-    (-> referenceable-type-def clojure.datafy/datafy omrs/map->TypeDef)
-    => referenceable-type-def)
-  (fact "subtype entity def"
-    (-> asset-type-def clojure.datafy/datafy omrs/map->TypeDef)
-    => asset-type-def))
-
-(facts "Round trip TypeDef -> map -> TypeDef"
-  (fact "relationship def"
-    (-> foreign-key-type-def clojure.datafy/datafy omrs/map->TypeDef)
-    => foreign-key-type-def))
-
-(facts "Round trip TypeDef -> map -> TypeDef"
-  (fact "classification def"
-    (-> anchors-type-def clojure.datafy/datafy omrs/map->TypeDef)
-    => anchors-type-def))
+(doseq [attr-type-def (.getKnownAttributeTypeDefs repo-helper)]
+  (fact
+    (-> attr-type-def
+      datafy
+      omrs-datafy/map->AttributeTypeDef)
+    =>
+    attr-type-def))
 
