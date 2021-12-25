@@ -2,7 +2,7 @@
   (:require [clojure.core.protocols :as p]
             [clojure.datafy :refer [datafy]]
             [io.kosong.egeria.omrs :as omrs])
-  (:import (org.odpi.openmetadata.repositoryservices.connectors.stores.metadatacollectionstore.properties.instances PrimitivePropertyValue ArrayPropertyValue MapPropertyValue EnumPropertyValue InstanceStatus)
+  (:import (org.odpi.openmetadata.repositoryservices.connectors.stores.metadatacollectionstore.properties.instances PrimitivePropertyValue ArrayPropertyValue MapPropertyValue EnumPropertyValue InstanceStatus InstanceProvenanceType Classification EntityDetail EntitySummary InstanceType InstanceProperties StructPropertyValue InstancePropertyCategory EntityProxy Relationship)
            (org.odpi.openmetadata.repositoryservices.connectors.stores.metadatacollectionstore.properties.typedefs TypeDef EntityDef RelationshipDef ClassificationDef PrimitiveDef CollectionDef EnumElementDef EnumDef AttributeTypeDef PrimitiveDefCategory CollectionDefCategory TypeDefAttribute ExternalStandardMapping AttributeTypeDefCategory AttributeCardinality TypeDefAttributeStatus TypeDefStatus TypeDefCategory TypeDefLink ClassificationPropagationRule RelationshipEndDef RelationshipEndCardinality)))
 
 ;;
@@ -73,7 +73,8 @@
 
 (def ^:private type-def-link->map
   #:openmetadata.TypeDef
-      {:guid               (fn [^TypeDefLink o] (.getGUID o))
+      {:headerVersion      (fn [^TypeDefLink o] (.getHeaderVersion o))
+       :guid               (fn [^TypeDefLink o] (.getGUID o))
        :name               (fn [^TypeDefLink o] (.getName o))
        :status             (fn [^TypeDefLink o] (some-> (.getStatus o) .name))
        :replacedByTypeGUID (fn [^TypeDefLink o] (.getReplacedByTypeGUID o))
@@ -122,6 +123,89 @@
         {:validEntityDefs (fn [^ClassificationDef o] (some->> o (.getValidEntityDefs) (mapv #(.getGUID %))))
          :propagatable    (fn [^ClassificationDef o] (.isPropagatable o))}))
 
+
+(def ^:private entity-instance->map
+  #:openmetadata.Entity
+      {:guid                 nil
+       :instanceURL          nil
+       :reIdentifiedFromGUID nil})
+
+(def ^:private classification->map
+  #:openmetadata.Classification
+      {:headerVersion            (fn [^Classification o] (.getHeaderVersion o))
+       :type                     (fn [^Classification o] (some-> o .getType .getTypeDefGUID))
+       :instanceProvenanceType   (fn [^Classification o] (some-> o .getInstanceProvenanceType .name))
+       :metadataCollectionId     (fn [^Classification o] (.getMetadataCollectionId o))
+       :metadataCollectionName   (fn [^Classification o] (.getMetadataCollectionName o))
+       :replicatedBy             (fn [^Classification o] (.getReplicatedBy o))
+       :instanceLicense          (fn [^Classification o] (.getInstanceLicense o))
+       :createdBy                (fn [^Classification o] (.getCreatedBy o))
+       :updatedBy                (fn [^Classification o] (.getUpdatedBy o))
+       :maintainedBy             (fn [^Classification o] (.getMaintainedBy o))
+       :createTime               (fn [^Classification o] (.getCreateTime o))
+       :updateTime               (fn [^Classification o] (.getUpdateTime o))
+       :version                  (fn [^Classification o] (.getVersion o))
+       :status                   (fn [^Classification o] (some-> o .getStatus .name))
+       :statusOnDelete           (fn [^Classification o] (some-> o .getStatusOnDelete .name))
+       :mappingProperties        (fn [^Classification o] (.getMappingProperties o))
+       :name                     (fn [^Classification o] (.getName o))
+       :classificationOrigin     (fn [^Classification o] (.getClassificationOrigin o))
+       :classificationOriginGUID (fn [^Classification o] (.getClassificationOriginGUID o))})
+
+(def ^:private entity-summary->map
+  #:openmetadata.Entity
+      {:headerVersion          (fn [^EntitySummary o] (.getHeaderVersion o))
+       :type                   (fn [^EntitySummary o] (some-> o .getType .getTypeDefGUID))
+       :instanceProvenanceType (fn [^EntitySummary o] (some-> o .getInstanceProvenanceType .name))
+       :metadataCollectionId   (fn [^EntitySummary o] (.getMetadataCollectionId o))
+       :metadataCollectionName (fn [^EntitySummary o] (.getMetadataCollectionName o))
+       :replicatedBy           (fn [^EntitySummary o] (.getReplicatedBy o))
+       :instanceLicense        (fn [^EntitySummary o] (.getInstanceLicense o))
+       :createdBy              (fn [^EntitySummary o] (.getCreatedBy o))
+       :updatedBy              (fn [^EntitySummary o] (.getUpdatedBy o))
+       :maintainedBy           (fn [^EntitySummary o] (.getMaintainedBy o))
+       :createTime             (fn [^EntitySummary o] (.getCreateTime o))
+       :updateTime             (fn [^EntitySummary o] (.getUpdateTime o))
+       :version                (fn [^EntitySummary o] (.getVersion o))
+       :status                 (fn [^EntitySummary o] (some-> o .getStatus .name))
+       :statusOnDelete         (fn [^EntitySummary o] (some-> o .getStatusOnDelete .name))
+       :mappingProperties      (fn [^EntitySummary o] (.getMappingProperties o))
+       :guid                   (fn [^EntitySummary o] (.getGUID o))
+       :instanceURL            (fn [^EntitySummary o] (.getInstanceURL o))
+       :reIdentifiedFromGUID   (fn [^EntitySummary o] (.getReIdentifiedFromGUID o))
+       :classifications        (fn [^EntitySummary o] (some->> o .getClassifications (mapv datafy)))})
+
+(def ^:private entity-detail->map
+  (merge entity-summary->map
+    {}))
+
+(def ^:private entity-proxy->map
+  (merge entity-summary->map
+    {:openmetadata.Entity/isProxy (fn [^EntityProxy o] true)}))
+
+(def ^:private relationship->map
+  #:openmetadata.Relationship
+      {:headerVersion          (fn [^Relationship o] (.getHeaderVersion o))
+       :type                   (fn [^Relationship o] (some-> o .getType .getTypeDefGUID))
+       :instanceProvenanceType (fn [^Relationship o] (some-> o .getInstanceProvenanceType .name))
+       :metadataCollectionId   (fn [^Relationship o] (.getMetadataCollectionId o))
+       :metadataCollectionName (fn [^Relationship o] (.getMetadataCollectionName o))
+       :replicatedBy           (fn [^Relationship o] (.getReplicatedBy o))
+       :instanceLicense        (fn [^Relationship o] (.getInstanceLicense o))
+       :createdBy              (fn [^Relationship o] (.getCreatedBy o))
+       :updatedBy              (fn [^Relationship o] (.getUpdatedBy o))
+       :maintainedBy           (fn [^Relationship o] (.getMaintainedBy o))
+       :createTime             (fn [^Relationship o] (.getCreateTime o))
+       :updateTime             (fn [^Relationship o] (.getUpdateTime o))
+       :version                (fn [^Relationship o] (.getVersion o))
+       :status                 (fn [^Relationship o] (some-> o .getStatus .name))
+       :statusOnDelete         (fn [^Relationship o] (some-> o .getStatusOnDelete .name))
+       :mappingProperties      (fn [^Relationship o] (.getMappingProperties o))
+       :guid                   (fn [^Relationship o] (.getGUID o))
+       :instanceURL            (fn [^Relationship o] (.getInstanceURL o))
+       :reIdentifiedFromGUID   (fn [^Relationship o] (.getReIdentifiedFromGUID o))
+       :entityOne              (fn [^Relationship o] (some-> o .getEntityOneProxy .getGUID))
+       :entityTwo              (fn [^Relationship o] (some-> o .getEntityTwoProxy .getGUID))})
 ;;
 ;; Data->Egeria mappings
 ;;
@@ -133,7 +217,9 @@
 (declare map->TypeDefLink)
 (declare map->RelationshipEndDef)
 (declare map->AttributeTypeDef)
-
+(declare map->InstanceType)
+(declare map->Classification)
+(declare map->EntityProxy)
 
 (def ^:private map->external-standard-mapping
   #:openmetadata.ExternalStandardMapping
@@ -176,8 +262,7 @@
          :argumentCount         (fn [^CollectionDef o v] (doto o (.setArgumentCount v)))
          :argumentTypes         (fn [^CollectionDef o v]
                                   (let [types (some->> v (mapv #(PrimitiveDefCategory/valueOf %)))]
-                                    (doto o
-                                      (.setArgumentTypes types))))}))
+                                    (doto o (.setArgumentTypes types))))}))
 
 (def ^:private map->enum-def
   (merge map->attribute-type-def
@@ -215,7 +300,8 @@
 
 (def ^:private map->type-def-link
   #:openmetadata.TypeDef
-      {:guid               (fn [^TypeDefLink o v] (doto o (.setGUID v)))
+      {:headerVersion      (fn [^TypeDefLink o v] (doto o (.setHeaderVersion v)))
+       :guid               (fn [^TypeDefLink o v] (doto o (.setGUID v)))
        :name               (fn [^TypeDefLink o v] (doto o (.setName v)))
        :status             (fn [^TypeDefLink o v]
                              (let [s (some-> v (TypeDefStatus/valueOf))]
@@ -286,6 +372,132 @@
                               (doto o (.setValidEntityDefs xs))))
          :propagatable    (fn [^ClassificationDef o v] (doto o (.setPropagatable v)))}))
 
+(def ^:private map->classification
+  #:openmetadata.Classification
+      {:headerVersion            (fn [^Classification o v] (doto o (.setHeaderVersion v)))
+       :type                     (fn [^Classification o v]
+                                   (let [x (some-> v map->InstanceType)]
+                                     (doto o (.setType x))))
+       :instanceProvenanceType   (fn [^Classification o v]
+                                   (let [x (some-> v InstanceProvenanceType/valueOf)]
+                                     (doto o (.setInstanceProvenanceType x))))
+       :metadataCollectionId     (fn [^Classification o v] (doto o (.setMetadataCollectionId v)))
+       :metadataCollectionName   (fn [^Classification o v] (doto o (.setMetadataCollectionName v)))
+       :replicatedBy             (fn [^Classification o v] (doto o (.setReplicatedBy v)))
+       :instanceLicense          (fn [^Classification o v] (doto o (.setInstanceLicense v)))
+       :createdBy                (fn [^Classification o v] (doto o (.setCreatedBy v)))
+       :updatedBy                (fn [^Classification o v] (doto o (.setUpdatedBy v)))
+       :maintainedBy             (fn [^Classification o v] (doto o (.setMaintainedBy v)))
+       :createTime               (fn [^Classification o v] (doto o (.setCreateTime v)))
+       :updateTime               (fn [^Classification o v] (doto o (.setUpdateTime v)))
+       :version                  (fn [^Classification o v] (doto o (.setVersion v)))
+       :status                   (fn [^Classification o v]
+                                   (let [x (some-> v InstanceStatus/valueOf)]
+                                     (doto o (.setStatus x))))
+       :statusOnDelete           (fn [^Classification o v]
+                                   (let [x (some-> v InstanceStatus/valueOf)]
+                                     (doto o (.setStatusOnDelete x))))
+       :mappingProperties        (fn [^Classification o v] (doto o (.setMappingProperties v)))
+       :name                     (fn [^Classification o v] (doto o (.setName v)))
+       :classificationOrigin     (fn [^Classification o v] (doto o (.setClassificationOrigin v)))
+       :classificationOriginGUID (fn [^Classification o v] (doto o (.setClassificationOriginGUID v)))})
+
+(def ^:private map->entity-summary
+  #:openmetadata.Entity
+      {:headerVersion          (fn [^EntitySummary o v] (doto o (.setHeaderVersion v)))
+       :type                   (fn [^EntitySummary o v]
+                                 (let [x (some-> v map->InstanceType)]
+                                   (doto o (.setType x))))
+       :instanceProvenanceType (fn [^EntitySummary o v]
+                                 (let [x (some-> v InstanceProvenanceType/valueOf)]
+                                   (doto o (.setInstanceProvenanceType x))))
+       :metadataCollectionId   (fn [^EntitySummary o v] (doto o (.setMetadataCollectionId v)))
+       :metadataCollectionName (fn [^EntitySummary o v] (doto o (.setMetadataCollectionName v)))
+       :replicatedBy           (fn [^EntitySummary o v] (doto o (.setReplicatedBy v)))
+       :instanceLicense        (fn [^EntitySummary o v] (doto o (.setInstanceLicense v)))
+       :createdBy              (fn [^EntitySummary o v] (doto o (.setCreatedBy v)))
+       :updatedBy              (fn [^EntitySummary o v] (doto o (.setUpdatedBy v)))
+       :maintainedBy           (fn [^EntitySummary o v] (doto o (.setMaintainedBy v)))
+       :createTime             (fn [^EntitySummary o v] (doto o (.setCreateTime v)))
+       :updateTime             (fn [^EntitySummary o v] (doto o (.setUpdateTime v)))
+       :version                (fn [^EntitySummary o v] (doto o (.setVersion v)))
+       :status                 (fn [^EntitySummary o v]
+                                 (let [x (some-> v InstanceStatus/valueOf)]
+                                   (doto o (.setStatus x))))
+       :statusOnDelete         (fn [^EntitySummary o v]
+                                 (let [x (some-> v InstanceStatus/valueOf)]
+                                   (doto o (.setStatusOnDelete x))))
+       :mappingProperties      (fn [^EntitySummary o v] (doto o (.setMappingProperties v)))
+       :guid                   (fn [^EntitySummary o v] (doto o (.setGUID v)))
+       :instanceURL            (fn [^EntitySummary o v] (doto o (.setInstanceURL v)))
+       :reIdentifiedFromGUID   (fn [^EntitySummary o v] (doto o (.setReIdentifiedFromGUID v)))
+       :classifications        (fn [^EntitySummary o v]
+                                 (let [xs (some->> v (mapv map->Classification))]
+                                   (doto o (.setClassifications xs))))})
+
+(def ^:private map->entity-detail
+  (merge map->entity-summary
+    {}))
+
+(def ^:private map->entity-proxy
+  (merge map->entity-summary
+    {}))
+
+
+
+(def ^:private map->instance-type
+  #:openmetadata.TypeDef
+      {:guid                    (fn [^InstanceType o v] (doto o (.setTypeDefGUID v)))
+       :name                    (fn [^InstanceType o v] (doto o (.setTypeDefName v)))
+       :version                 (fn [^InstanceType o v] (doto o (.setTypeDefVersion v)))
+       :category                (fn [^InstanceType o v]
+                                  (let [x (some-> v TypeDefCategory/valueOf)]
+                                    (doto o (.setTypeDefCategory x))))
+       :ancestorTypes           (fn [^InstanceType o v]
+                                  (let [xs (mapv map->TypeDefLink v)]
+                                    (doto o (.setTypeDefSuperTypes xs))))
+       :description             (fn [^InstanceType o v] (doto o (.setTypeDefDescription v)))
+       :descriptionGUID         (fn [^InstanceType o v] (doto o (.setTypeDefDescriptionGUID v)))
+       :validInstanceStatusList (fn [^InstanceType o v]
+                                  o
+                                  ;; A bug in Egeria Repository Content Manager to always return null for validStatusList
+                                  #_(let [xs (some->> v (mapv #(InstanceStatus/valueOf %)))]
+                                      (doto o (.setValidStatusList xs))))
+       :validInstanceProperties (fn [^InstanceType o v]
+                                  (let [xs (mapv :openmetadata.TypeDefAttribute/attributeName v)]
+                                    (doto o (.setValidInstanceProperties xs))))})
+
+(def ^:private map->relationship
+  #:openmetadata.Relationship
+      {:headerVersion          (fn [^Relationship o v] (doto o (.setHeaderVersion v)))
+       :type                   (fn [^Relationship o v]
+                                 (let [x (some-> v map->InstanceType)]
+                                   (doto o (.setType x))))
+       :instanceProvenanceType (fn [^Classification o v]
+                                 (let [x (some-> v InstanceProvenanceType/valueOf)]
+                                   (doto o (.setInstanceProvenanceType x))))
+       :metadataCollectionId   (fn [^Relationship o v] (doto o (.setMetadataCollectionId v)))
+       :metadataCollectionName (fn [^Relationship o v] (doto o (.setMetadataCollectionName v)))
+       :replicatedBy           (fn [^Relationship o v] (doto o (.setReplicatedBy v)))
+       :instanceLicense        (fn [^Relationship o v] (doto o (.setInstanceLicense v)))
+       :createdBy              (fn [^Relationship o v] (doto o (.setCreatedBy v)))
+       :updatedBy              (fn [^Relationship o v] (doto o (.setUpdatedBy v)))
+       :maintainedBy           (fn [^Relationship o v] (doto o (.setMaintainedBy v)))
+       :createTime             (fn [^Relationship o v] (doto o (.setCreateTime v)))
+       :updateTime             (fn [^Relationship o v] (doto o (.setUpdateTime v)))
+       :version                (fn [^Relationship o v] (doto o (.setVersion v)))
+       :status                 (fn [^Relationship o v]
+                                 (let [x (some-> v InstanceStatus/valueOf)]
+                                   (doto o (.setStatus x))))
+       :statusOnDelete         (fn [^Relationship o v]
+                                 (let [x (some-> v InstanceStatus/valueOf)]
+                                   (doto o (.setStatusOnDelete x))))
+       :mappingProperties      (fn [^Relationship o v] (doto o (.setMappingProperties v)))
+       :guid                   (fn [^Relationship o v] (doto o (.setGUID v)))
+       :instanceURL            (fn [^Relationship o v] (doto o (.setInstanceURL v)))
+       :reIdentifiedFromGUID   (fn [^Relationship o v] (doto o (.setReIdentifiedFromGUID v)))
+       :entityOne              (fn [^Relationship o v] (doto o (.setEntityOneProxy (some-> v map->EntityProxy))))
+       :entityTwo              (fn [^Relationship o v] (doto o (.setEntityTwoProxy (some-> v map->EntityProxy))))})
 ;;
 ;; Data navigation functions
 ;;
@@ -293,17 +505,18 @@
 (defmulti navigate (fn [_ _ k _] k))
 
 (defn- nav-attribute-type-def [repository-helper guid]
-  (if repository-helper
-    (binding [omrs/*repo-helper* repository-helper]
-      (omrs/find-attribute-type-def-by-guid guid))
-    guid))
+  (when guid
+    (omrs/find-attribute-type-def-by-guid guid)))
 
 (defn- nav-type-def [repository-helper guid]
-  (if repository-helper
-    (binding [omrs/*repo-helper* repository-helper]
-      (when guid
-        (omrs/find-type-def-by-guid guid)))
-    guid))
+  (when guid
+    (omrs/find-type-def-by-guid guid)))
+
+(defn- nav-entity [guid]
+  (when guid
+    (omrs/find-entity-by-guid guid)))
+
+(defn- nav-classification [guid])
 
 (defmethod navigate :openmetadata.TypeDefAttribute/attributeType
   [{:keys [repository-helper]} coll k v]
@@ -321,6 +534,18 @@
   [{:keys [repository-helper]} coll k v]
   (->> v
     (mapv #(nav-type-def repository-helper %))))
+
+(defmethod navigate :openmetadata.Classification/type
+  [{:keys [repository-helper]} coll k v]
+  (nav-type-def repository-helper v))
+
+(defmethod navigate :openmetadata.Entity/type
+  [{:keys [repository-helper]} coll k v]
+  (nav-type-def repository-helper v))
+
+(defmethod navigate :openmetadata.Relationship/type
+  [{:keys [repository-helper]} coll k v]
+  (nav-type-def repository-helper v))
 
 (defmethod navigate :default [_ coll _ v] v)
 
@@ -407,11 +632,83 @@
     (when-let [instance-props (some-> o .getMapValues .getInstanceProperties)]
       (reduce-kv (fn [m k pv] (assoc m k (datafy pv))) {} instance-props))))
 
+(extend-type StructPropertyValue
+  p/Datafiable
+  (datafy [^StructPropertyValue o]
+    (when-let [instance-props (some-> o .getAttributes .getInstanceProperties)]
+      (reduce-kv (fn [m k pv] (assoc m k (datafy pv))) {} instance-props))))
+
 (extend-type EnumPropertyValue
   p/Datafiable
   (datafy [^EnumPropertyValue o]
     (.getSymbolicName o)))
 
+(defn- valid-type-def-attributes [type-def]
+  (->> (omrs/find-type-def-ancestors type-def)
+    (cons type-def)
+    (reverse)
+    (mapcat (fn [type-def]
+              (map (fn [attr-type-def]
+                     [type-def attr-type-def])
+                (:openmetadata.TypeDef/propertiesDefinition type-def))))
+    (reduce (fn [m [type-def attr-type-def :as v]]
+              (let [k (:openmetadata.TypeDefAttribute/attributeName attr-type-def)]
+                (assoc m k v))) {})
+    (vals)))
+
+(defn- ->fully-qualifed-attribute-name [type-def attr-def]
+  (let [ns   (str "openmetadata." (:openmetadata.TypeDef/name type-def))
+        name (:openmetadata.TypeDefAttribute/attributeName attr-def)]
+    (keyword ns name)))
+
+(defn instance-properties->map [type-def ^InstanceProperties instance-props]
+  (let [name->attr-key (->> (valid-type-def-attributes type-def)
+                         (map #(apply ->fully-qualifed-attribute-name %))
+                         (reduce (fn [a kw] (assoc a (name kw) kw)) {}))]
+    (reduce (fn [m [name value]]
+              (assoc m (name->attr-key name) (datafy value)))
+      {}
+      (some-> instance-props .getInstanceProperties))))
+
+(extend-type Classification
+  p/Datafiable
+  (datafy [^Classification o]
+    (let [props    (.getProperties o)
+          guid     (-> o .getType .getTypeDefGUID)
+          type-def (omrs/find-type-def-by-guid guid)]
+      (merge
+        (datafy-egeria classification->map o)
+        (instance-properties->map type-def props)))))
+
+(extend-type EntityDetail
+  p/Datafiable
+  (datafy [^EntityDetail o]
+    (let [props    (.getProperties o)
+          guid     (-> o .getType .getTypeDefGUID)
+          type-def (omrs/find-type-def-by-guid guid)]
+      (merge
+        (datafy-egeria entity-summary->map o)
+        (instance-properties->map type-def props)))))
+
+(extend-type EntityProxy
+  p/Datafiable
+  (datafy [^EntityProxy o]
+    (let [props    (.getUniqueProperties o)
+          guid     (-> o .getType .getTypeDefGUID)
+          type-def (omrs/find-type-def-by-guid guid)]
+      (merge
+        (datafy-egeria entity-proxy->map o)
+        (instance-properties->map type-def props)))))
+
+(extend-type Relationship
+  p/Datafiable
+  (datafy [^Relationship o]
+    (let [props    (.getProperties o)
+          guid     (-> o .getType .getTypeDefGUID)
+          type-def (omrs/find-type-def-by-guid guid)]
+      (merge
+        (datafy-egeria relationship->map o)
+        (instance-properties->map type-def props)))))
 ;;
 ;; Data->Egeria
 ;;
@@ -469,3 +766,126 @@
 
 (defn map->ExternalStandardMappings [m]
   (map->egeria map->external-standard-mapping (ExternalStandardMapping.) m))
+
+(defmulti ->InstancePropertyValue
+  (fn [attr-type-def v]
+    (or
+      (some-> attr-type-def :openmetadata.CollectionDef/collectionDefCategory
+        CollectionDefCategory/valueOf)
+      (some-> attr-type-def :openmetadata.AttributeTypeDef/category
+        AttributeTypeDefCategory/valueOf))))
+
+(defmethod ->InstancePropertyValue AttributeTypeDefCategory/PRIMITIVE
+  [attr-type-def v]
+  (when v
+    (let [primitive-def-category (some-> attr-type-def
+                                   :openmetadata.PrimitiveDef/primitiveDefCategory
+                                   PrimitiveDefCategory/valueOf)]
+      (doto (PrimitivePropertyValue.)
+        (.setTypeGUID (:openmetadata.AttributeTypeDef/guid attr-type-def))
+        (.setTypeName (:openmetadata.AttributeTypeDef/name attr-type-def))
+        (.setPrimitiveDefCategory primitive-def-category)
+        (.setInstancePropertyCategory InstancePropertyCategory/PRIMITIVE)
+        (.setPrimitiveValue v)))))
+
+(defmethod ->InstancePropertyValue AttributeTypeDefCategory/ENUM_DEF
+  [attr-type-def v]
+  (when v
+    (let [enum-element-def (->> (:openmetadata.EnumDef/elementDefs attr-type-def)
+                             (filter #(= v (:openmetadata.EnumElementDef/value %)))
+                             (first))]
+      (doto (EnumPropertyValue.)
+        (.setTypeGUID (:openmetadata.AttributeTypeDef/guid attr-type-def))
+        (.setTypeName (:openmetadata.AttributeTypeDef/name attr-type-def))
+        (.setDescription (:openmetadata.EnumElementDef/description enum-element-def))
+        (.setSymbolicName (:openmetadata.EnumElementDef/value enum-element-def))
+        (.setOrdinal (:openmetadata.EnumElementDef/ordinal enum-element-def))))))
+
+(defmethod ->InstancePropertyValue CollectionDefCategory/OM_COLLECTION_ARRAY
+  [attr-type-def v]
+  (when v
+    (let [elem-type (some->> attr-type-def
+                      :openmetadata.CollectionDef/argumentTypes
+                      (map (fn [x] {:openmetadata.AttributeTypeDef/category         (.name AttributeTypeDefCategory/PRIMITIVE)
+                                    :openmetadata.PrimitiveDef/primitiveDefCategory x}))
+                      first)
+          pv        (doto (ArrayPropertyValue.)
+                      (.setTypeGUID (:openmetadata.AttributeTypeDef/guid attr-type-def))
+                      (.setTypeName (:openmetadata.AttributeTypeDef/name attr-type-def))
+                      (.setArrayCount (count v)))]
+      (doseq [[idx x] (map-indexed #(vector %1 %2) v)]
+        (.setArrayValue pv idx (->InstancePropertyValue elem-type x)))
+      pv)))
+
+(defmethod ->InstancePropertyValue CollectionDefCategory/OM_COLLECTION_MAP
+  [attr-type-def v]
+  (when v
+    (let [elem-types (some->> attr-type-def
+                       :openmetadata.CollectionDef/argumentTypes
+                       (map (fn [x] {:openmetadata.AttributeTypeDef/category         (.name AttributeTypeDefCategory/PRIMITIVE)
+                                     :openmetadata.PrimitiveDef/primitiveDefCategory x})))
+          pv         (doto (MapPropertyValue.)
+                       (.setTypeGUID (:openmetadata.AttributeTypeDef/guid attr-type-def))
+                       (.setTypeName (:openmetadata.AttributeTypeDef/name attr-type-def)))]
+      (doseq [[k x] v]
+        (.setMapValue pv (str k) (->InstancePropertyValue (second elem-types) x)))
+      pv)))
+
+(defn attribute-key->attribute-type [type-def]
+  (reduce (fn [m [type-def type-def-attr]]
+            (let [k             (->fully-qualifed-attribute-name type-def type-def-attr)
+                  guid          (:openmetadata.TypeDefAttribute/attributeType type-def-attr)
+                  attr-type-def (omrs/find-attribute-type-def-by-guid guid)]
+              (assoc m k attr-type-def)))
+    {}
+    (valid-type-def-attributes type-def)))
+
+(defn map->InstanceProperties [type-def m]
+  (let [attr-key->type (attribute-key->attribute-type type-def)]
+    (reduce-kv (fn [o attr-key attr-type]
+                 (let [prop-name  (name attr-key)
+                       prop-value (some->> (attr-key m)
+                                    (->InstancePropertyValue attr-type))]
+                   (if prop-value
+                     (doto o (.setProperty prop-name prop-value))
+                     o)))
+      (InstanceProperties.)
+      attr-key->type)))
+
+
+
+(defn map->Classification [m]
+  (let [^Classification o (map->egeria map->classification (Classification.) m)
+        type-def          (omrs/find-type-def-by-guid (:openmetadata.Classification/type m))
+        instance-props    (map->InstanceProperties type-def m)]
+    (doto o (.setProperties instance-props))))
+
+(defn map->EntitySummary [m]
+  (map->egeria map->entity-summary (EntitySummary.) m))
+
+(defn map->EntityDetail [m]
+  (let [^EntityDetail o (map->egeria map->entity-detail (EntityDetail.) m)
+        type-def        (omrs/find-type-def-by-guid (:openmetadata.Entity/type m))
+        instance-props  (map->InstanceProperties type-def m)]
+    (doto o (.setProperties instance-props))))
+
+(defn map->EntityProxy [m]
+  (let [^EntityProxy o (map->egeria map->entity-proxy (EntityProxy.) m)
+        type-def       (omrs/find-type-def-by-guid (:openmetadata.Entity/type m))
+        instance-props (map->InstanceProperties type-def m)]
+    (doto o (.setUniqueProperties instance-props))))
+
+(defn map->InstanceType [m]
+  (let [ancestors       (omrs/find-type-def-ancestors m)
+        type-attr-pairs (valid-type-def-attributes m)
+        attrs           (mapv second type-attr-pairs)
+        m               (-> m
+                          (assoc :openmetadata.TypeDef/ancestorTypes ancestors)
+                          (assoc :openmetadata.TypeDef/validInstanceProperties attrs))]
+    (map->egeria map->instance-type (InstanceType.) m)))
+
+(defn map->Relationship [m]
+  (let [^Relationship o (map->egeria map->relationship (Relationship.) m)
+        type-def        (omrs/find-type-def-by-guid (:openmetadata.Relationship/type m))
+        instance-props  (map->InstanceProperties type-def m)]
+    (doto o (.setProperties instance-props))))

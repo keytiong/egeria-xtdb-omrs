@@ -1,6 +1,7 @@
 (ns io.kosong.egeria.omrs.xtdb.xtdb-metadata-collection
   (:require [clojure.datafy :refer [datafy]]
             [io.kosong.egeria.omrs :as omrs]
+            [io.kosong.egeria.omrs.datafy :as omrs-datafy]
             [xtdb.api :as xt])
   (:import (org.odpi.openmetadata.repositoryservices.connectors.stores.metadatacollectionstore.repositoryconnector OMRSRepositoryConnector OMRSRepositoryHelper OMRSRepositoryValidator)
            (org.odpi.openmetadata.repositoryservices.connectors.stores.metadatacollectionstore.properties.typedefs TypeDef TypeDefPatch AttributeTypeDef TypeDefSummary)
@@ -125,16 +126,16 @@
 
     (binding [omrs/*repo-helper* repository-helper]
       (doseq [m attr-type-defs]
-        (let [obj (omrs/map->AttributeTypeDef m)]
+        (let [obj (omrs-datafy/map->AttributeTypeDef m)]
           (.addAttributeTypeDef repository-content-manager "init-content-manager" obj)))
       (doseq [m entity-type-defs]
-        (let [obj (omrs/map->TypeDef m)]
+        (let [obj (omrs-datafy/map->TypeDef m)]
           (.addTypeDef repository-content-manager "init-content-manager" obj)))
       (doseq [m relationship-type-defs]
-        (let [obj (omrs/map->TypeDef m)]
+        (let [obj (omrs-datafy/map->TypeDef m)]
           (.addTypeDef repository-content-manager "init-content-manager" obj)))
       (doseq [m classification-type-defs]
-        (let [obj (omrs/map->TypeDef m)]
+        (let [obj (omrs-datafy/map->TypeDef m)]
           (.addTypeDef repository-content-manager "init-content-manager" obj))))))
 
 (gen-class

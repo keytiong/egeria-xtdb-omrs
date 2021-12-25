@@ -118,7 +118,7 @@
 
 (integrant.repl/set-prep! (constantly egeria-config))
 
-(defn dataset-instance []
+#_(defn dataset-instance []
   (let [instance-props (doto (InstanceProperties.)
                          (.setProperty "name" (doto (PrimitivePropertyValue.)
                                                 (.setPrimitiveDefCategory PrimitiveDefCategory/OM_PRIMITIVE_TYPE_STRING)
@@ -131,7 +131,7 @@
       instance-props
       Collections/EMPTY_LIST)))
 
-(defn csv-file-instance []
+#_(defn csv-file-instance []
   (let [instance-props (doto (InstanceProperties.)
                          (.setProperty "name" (doto (PrimitivePropertyValue.)
                                                 (.setPrimitiveDefCategory PrimitiveDefCategory/OM_PRIMITIVE_TYPE_STRING)
@@ -193,7 +193,7 @@
       (.updateTypeDef metadata-collection user-id patch))))
 
 
-(defn load-entity-detail [edn]
+#_(defn load-entity-detail [edn]
   (->> (io/resource edn)
     (slurp)
     (edn/read-string)

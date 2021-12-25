@@ -2,7 +2,9 @@
   (:use [midje.sweet])
   (:require [io.kosong.egeria.omrs :as omrs]
             [io.kosong.egeria.omrs.datafy :as omrs-datafy]
-            [clojure.datafy :refer [datafy]]))
+            [clojure.datafy :refer [datafy]])
+  (:import (org.odpi.openmetadata.repositoryservices.connectors.stores.metadatacollectionstore.properties.instances InstanceProvenanceType InstanceProperties ClassificationOrigin)
+           (org.odpi.openmetadata.repositoryservices.connectors.stores.metadatacollectionstore.repositoryconnector OMRSRepositoryHelper)))
 
 (def server-name "omrs-test-server")
 (def server-type "Open Metadata Repository Service")
@@ -12,6 +14,10 @@
 (def component-name "Egeria XTDB Open Metadata Repository Service")
 (def component-description "Egeria XTDB Open Metadata Repository Service")
 (def component-wiki-url "https://github.com/keytiong")
+
+(def source-name "omrs-test")
+(def metadata-collection-id "3750803c-0566-4e8b-ac2a-5b551bd152ac")
+(def metadata-collection-name "omrs-unitest-metadata-collection")
 
 (def audit-log-store
   (omrs/->null-audit-log-store))
@@ -36,7 +42,7 @@
   (omrs/->repository-content-manager {:user-id   user-id
                                       :audit-log audit-log}))
 
-(def repo-helper
+(def ^OMRSRepositoryHelper repo-helper
   (omrs/->repository-helper {:content-manager repo-content-manager}))
 
 (omrs/set-repo-helper! repo-helper)
@@ -98,6 +104,10 @@
 (def anchors-type-def
   (type-def-by-name "Anchors"))
 
+(comment
+  (datafy (type-def-by-name "Asset"))
+  *e)
+
 (facts "Datafy PrimitiveDef"
   (let [datafied (datafy primitive-string-def)]
     (fact
@@ -139,4 +149,66 @@
       omrs-datafy/map->AttributeTypeDef)
     =>
     attr-type-def))
+
+(def anchor-classification (.getNewClassification repo-helper
+                             "omrs-test"                                        ; sourceName
+                             metadata-collection-id
+                             metadata-collection-name
+                             InstanceProvenanceType/LOCAL_COHORT
+                             user-id
+                             "Anchors"                                           ; Classification Type Name
+                             "Asset"                                            ; Entity Type Name
+                             ClassificationOrigin/ASSIGNED
+                             nil ; Classification Origin GUID
+                             (InstanceProperties.)))
+
+(def asset-entity
+  (let [props (let [p (InstanceProperties.)]
+                (.addStringPropertyToInstance repo-helper
+                  source-name
+                  p
+                  "name"
+                  "foo"
+                  "test-1")
+                p)]
+    (.getNewEntity repo-helper
+      source-name
+      metadata-collection-id
+      metadata-collection-name
+      InstanceProvenanceType/LOCAL_COHORT
+      user-id,
+      "Asset"
+      props
+      [anchor-classification])))
+
+(fact
+  (-> anchor-classification
+    datafy
+    omrs-datafy/map->Classification)
+  =>
+  anchor-classification)
+
+(fact
+  (-> asset-entity
+    datafy
+    omrs-datafy/map->EntityDetail)
+  => asset-entity)
+
+(def foreign-key-relationship (.getNewRelationship repo-helper
+                                source-name
+                                metadata-collection-id
+                                metadata-collection-name
+                                InstanceProvenanceType/LOCAL_COHORT
+                                user-id,
+                                "ForeignKey"
+                                (InstanceProperties.)))
+
+(fact
+  (-> foreign-key-relationship
+    datafy
+    omrs-datafy/map->Relationship)
+  => foreign-key-relationship)
+
+
+
 
