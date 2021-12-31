@@ -1,142 +1,15 @@
 (ns io.kosong.egeria.omrs.xtdb.xtdb-metadata-collection
   (:require [clojure.datafy :refer [datafy]]
-            [io.kosong.egeria.omrs :as omrs]
-            [io.kosong.egeria.omrs.datafy :as omrs-datafy]
+            [io.kosong.egeria.omrs :as om]
+            [io.kosong.egeria.omrs.xtdb.metadata-store :as store]
+            [io.kosong.egeria.omrs.datafy :as om-datafy]
             [xtdb.api :as xt])
-  (:import (org.odpi.openmetadata.repositoryservices.connectors.stores.metadatacollectionstore.repositoryconnector OMRSRepositoryConnector OMRSRepositoryHelper OMRSRepositoryValidator)
-           (org.odpi.openmetadata.repositoryservices.connectors.stores.metadatacollectionstore.properties.typedefs TypeDef TypeDefPatch AttributeTypeDef TypeDefSummary)
-           (org.odpi.openmetadata.repositoryservices.connectors.stores.metadatacollectionstore.properties.instances EntityDetail InstanceProperties EntitySummary InstanceStatus EntityProxy ClassificationOrigin Classification Relationship)
+  (:import (org.odpi.openmetadata.repositoryservices.connectors.stores.metadatacollectionstore.properties.typedefs TypeDef AttributeTypeDef TypeDefSummary)
+           (org.odpi.openmetadata.repositoryservices.connectors.stores.metadatacollectionstore.properties.instances EntityDetail InstanceProperties EntitySummary InstanceStatus EntityProxy ClassificationOrigin Classification Relationship InstanceProvenanceType)
            (java.util Date Collections List)
            (org.odpi.openmetadata.repositoryservices.connectors.stores.metadatacollectionstore.properties HistorySequencingOrder SequencingOrder MatchCriteria)
            (org.odpi.openmetadata.repositoryservices.connectors.stores.metadatacollectionstore.properties.search SearchProperties SearchClassifications)
            (org.odpi.openmetadata.frameworks.auditlog AuditLog)))
-
-;;
-;; Hack to access private OMRSContentManager memeber in OMRSRepositoryHelper
-;;
-(defn- content-manager [repo-helper]
-  (let [m (.. repo-helper getClass (getDeclaredField "repositoryContentManager"))]
-    (.setAccessible m true)
-    (.get m repo-helper)))
-
-;;
-;; Source: https://groups.google.com/g/clojure/c/-sypb2Djhio/m/r9AzRpwTgRkJ
-;; Credit: John Harrop
-;;
-
-(defn- find-a-node [deps already-have-nodes]
-  (some (fn [[k v]] (if (empty? (remove already-have-nodes v)) k)) deps))
-
-(defn- order-nodes [deps]
-  (loop [deps deps already-have-nodes #{} output []]
-    (if (empty? deps)
-      output
-      (if-let [item (find-a-node deps already-have-nodes)]
-        (recur
-          (dissoc deps item)
-          (conj already-have-nodes item)
-          (conj output item))
-        (throw (Exception. "Circular dependency."))))))
-
-(defn- type-def-deps-graph [type-defs]
-  (let [f (fn [m type-def]
-            (let [n  (:openmetadata.TypeDef/guid type-def)
-                  e  (:openmetadata.TypeDef/superType type-def)
-                  es (or (get m n) #{})]
-              (if e
-                (assoc m n (conj es e))
-                (assoc m n es))))]
-    (reduce f {} type-defs)))
-
-(defn- topology-sort [type-defs]
-  (let [g            (type-def-deps-graph type-defs)
-        sorted-guids (order-nodes g)
-        type-def-map (reduce (fn [a type-def]
-                               (let [k (:openmetadata.TypeDef/guid type-def)]
-                                 (assoc a k type-def)))
-                       {}
-                       type-defs)]
-    (reduce (fn [coll guid] (conj coll (type-def-map guid))) [] sorted-guids)))
-
-(defn- random-uuid-str []
-  (str (java.util.UUID/randomUUID)))
-
-(defn- ensure-xt-id [doc]
-  (if (:xt/id doc)
-    doc
-    (assoc doc :xt/id (random-uuid-str))))
-
-(defn- same-document? [doc-1 doc-2]
-  (= (dissoc doc-1 :xt/id) (dissoc doc-2 :xt/id)))
-
-(defn- fetch-entity-by-key-attribute-value [db key-attribute key-value]
-  (let [q   `{:find  [e]
-              :where [[e ~key-attribute ~key-value]]}
-        rs  (xt/q db q)
-        eid (ffirst rs)]
-    (when eid
-      (xt/entity db eid))))
-
-(defn fetch-type-def-by-guid [db guid]
-  (fetch-entity-by-key-attribute-value db :openmetadata.TypeDef/guid guid))
-
-(defn fetch-attribute-type-def-by-guid [db guid]
-  (fetch-entity-by-key-attribute-value db :openmetadata.AttributeTypeDef/guid guid))
-
-(defn- store-type-def [xtdb-node type-def]
-  (let [type-def   (ensure-xt-id type-def)
-        valid-time (or (:openmetadata.TypeDef/updateTime type-def)
-                     (:openmetadata.TypeDef/createTime type-def)
-                     (Date.))]
-    (xt/submit-tx xtdb-node [[::xt/put type-def valid-time]])))
-
-(defn- store-attribute-type-def [xtdb-node attribute-type-def]
-  (let [attribute-type-def (ensure-xt-id attribute-type-def)]
-    (xt/submit-tx xtdb-node [[::xt/put attribute-type-def]])))
-
-(defn fetch-entities-by-key-attribute [db key-attribute]
-  (let [q   `{:find  [e]
-              :where [[e ~key-attribute]]}
-        rs  (xt/q db q)
-        ids (map first rs)]
-    (map #(xt/entity db %) ids)))
-
-(defn fetch-type-defs [db]
-  (fetch-entities-by-key-attribute db :openmetadata.TypeDef/guid))
-
-(defn fetch-attribute-type-defs [db]
-  (fetch-entities-by-key-attribute db :openmetadata.AttributeTypeDef/guid))
-
-(defn init-content-manager-from-store [metadata-collection]
-  (let [{:keys [xtdb-node
-                repository-content-manager
-                repository-helper]} @(.state metadata-collection)
-        db                       (xt/db xtdb-node)
-        type-defs                (fetch-type-defs db)
-        entity-type-defs         (->> type-defs
-                                   (filter #(= (:openmetadata.TypeDef/category %) "ENTITY_DEF"))
-                                   topology-sort)
-        relationship-type-defs   (->> type-defs
-                                   (filter #(= (:openmetadata.TypeDef/category %) "RELATIONSHIP_DEF"))
-                                   topology-sort)
-        classification-type-defs (->> type-defs
-                                   (filter #(= (:openmetadata.TypeDef/category %) "CLASSIFICATION_DEF"))
-                                   topology-sort)
-        attr-type-defs           (fetch-attribute-type-defs db)]
-
-    (binding [omrs/*repo-helper* repository-helper]
-      (doseq [m attr-type-defs]
-        (let [obj (omrs-datafy/map->AttributeTypeDef m)]
-          (.addAttributeTypeDef repository-content-manager "init-content-manager" obj)))
-      (doseq [m entity-type-defs]
-        (let [obj (omrs-datafy/map->TypeDef m)]
-          (.addTypeDef repository-content-manager "init-content-manager" obj)))
-      (doseq [m relationship-type-defs]
-        (let [obj (omrs-datafy/map->TypeDef m)]
-          (.addTypeDef repository-content-manager "init-content-manager" obj)))
-      (doseq [m classification-type-defs]
-        (let [obj (omrs-datafy/map->TypeDef m)]
-          (.addTypeDef repository-content-manager "init-content-manager" obj))))))
 
 (gen-class
   :name io.kosong.egeria.omrs.xtdb.XtdbOMRSMetadataCollection
@@ -144,15 +17,19 @@
   :init init
   :post-init post-init
   :state state
-  :exposes-methods {setAuditLog                 superSetAuditLog
-                    addTypeDef                  superAddTypeDef
-                    updateTypeDef               superUpdateTypeDef
-                    addAttributeTypeDef         superAddAttributeTypeDef
-                    deleteTypeDef               superDeleteTypeDef
-                    deleteAttribtueTypeDef      superDeleteAttributeTypeDef
-                    reIdentifyTypeDef           superDeIdentifyTypeDef
-                    reIdentifyAttribtueTypeDef  superDeIdentifyAttribtueTypeDef
-                    reportTypeDefAlreadyDefined superReportTypeDefAlreadyDefined}
+  :exposes-methods {setAuditLog                             superSetAuditLog
+                    addTypeDef                              superAddTypeDef
+                    updateTypeDef                           superUpdateTypeDef
+                    addAttributeTypeDef                     superAddAttributeTypeDef
+                    deleteTypeDef                           superDeleteTypeDef
+                    deleteAttribtueTypeDef                  superDeleteAttributeTypeDef
+                    reIdentifyTypeDef                       superDeIdentifyTypeDef
+                    reIdentifyAttribtueTypeDef              superDeIdentifyAttribtueTypeDef
+                    reportTypeDefAlreadyDefined             superReportTypeDefAlreadyDefined
+                    addEntityParameterValidation            superAddEntityParameterValidation
+                    getInstanceParameterValidation          superGetInstanceParameterValidation
+                    updateInstanceStatusParameterValidation superUpdateInstanceStatusParameterValidation
+                    }
   :constructors {[io.kosong.egeria.omrs.xtdb.XtdbOMRSRepositoryConnector ;; parentConnector
                   String                                    ;; repositoryName
                   org.odpi.openmetadata.repositoryservices.connectors.stores.metadatacollectionstore.repositoryconnector.OMRSRepositoryHelper ;; repositoryHelper
@@ -167,110 +44,109 @@
                   String                                    ;; metadataCollectionId
                   ]})
 
-(defn -init [^io.kosong.egeria.omrs.xtdb.XtdbOMRSRepositoryConnector connector
-             ^String repositoryName
-             ^org.odpi.openmetadata.repositoryservices.connectors.stores.metadatacollectionstore.repositoryconnector.OMRSRepositoryHelper repositoryHelper
-             ^org.odpi.openmetadata.repositoryservices.connectors.stores.metadatacollectionstore.repositoryconnector.OMRSRepositoryValidator repositoryValidator
-             ^String metadataCollectionId
-             ^org.odpi.openmetadata.frameworks.auditlog.AuditLog auditLog]
-  (let [state (atom {:repository-name            repositoryName
-                     :metadata-collection-id     metadataCollectionId
-                     :repository-helper          repositoryHelper
-                     :repository-content-manager (content-manager repositoryHelper)
-                     :xtdb-node                  (some-> (.getXtdbNode connector) :node)})]
+(defn -init
+  [^io.kosong.egeria.omrs.xtdb.XtdbOMRSRepositoryConnector connector
+   ^String repositoryName
+   ^org.odpi.openmetadata.repositoryservices.connectors.stores.metadatacollectionstore.repositoryconnector.OMRSRepositoryHelper repositoryHelper
+   ^org.odpi.openmetadata.repositoryservices.connectors.stores.metadatacollectionstore.repositoryconnector.OMRSRepositoryValidator repositoryValidator
+   ^String metadataCollectionId
+   ^org.odpi.openmetadata.frameworks.auditlog.AuditLog auditLog]
+  (let [xtdb-node                (some-> (.getXtdbNode connector) :node)
+        context                  (om/->context {:type-store repositoryHelper})
+        server-name              (.getServerName connector)
+        metadata-collection-name (.getMetadataCollectionName connector)
+        state                    (atom {:server-name               server-name
+                                        :repository-name           repositoryName
+                                        :metadata-collection-id    metadataCollectionId
+                                        :metadata-collection-name  metadata-collection-name
+                                        :repository-content-helper repositoryHelper
+                                        :xtdb-node                 xtdb-node
+                                        :context                   context})]
     [[connector repositoryName repositoryHelper repositoryValidator metadataCollectionId] state]))
 
-(defn -post-init [this
-                  ^io.kosong.egeria.omrs.xtdb.XtdbOMRSRepositoryConnector connector
-                  ^String repositoryName
-                  ^org.odpi.openmetadata.repositoryservices.connectors.stores.metadatacollectionstore.repositoryconnector.OMRSRepositoryHelper repositoryHelper
-                  ^org.odpi.openmetadata.repositoryservices.connectors.stores.metadatacollectionstore.repositoryconnector.OMRSRepositoryValidator repositoryValidator
-                  ^String metadataCollectionId
-                  ^AuditLog auditLog]
-  (.superSetAuditLog this auditLog)
-  (init-content-manager-from-store this))
+(defn -post-init
+  [this
+   ^io.kosong.egeria.omrs.xtdb.XtdbOMRSRepositoryConnector connector
+   ^String repositoryName
+   ^org.odpi.openmetadata.repositoryservices.connectors.stores.metadatacollectionstore.repositoryconnector.OMRSRepositoryHelper repositoryHelper
+   ^org.odpi.openmetadata.repositoryservices.connectors.stores.metadatacollectionstore.repositoryconnector.OMRSRepositoryValidator repositoryValidator
+   ^String metadataCollectionId
+   ^AuditLog auditLog]
+  (.superSetAuditLog this auditLog))
 
-(defn -addTypeDef [this
-                   ^String userId
-                   ^TypeDef newTypeDef]
+(defn -addTypeDef
+  [this userId newTypeDef]
   (let [{:keys [xtdb-node
-                repository-content-manager
-                repository-name]} @(.state this)
-        incoming (datafy newTypeDef)]
+                context]} @(.state this)]
     (.superAddTypeDef this userId newTypeDef)
-    (store-type-def xtdb-node incoming)
-    (.addTypeDef repository-content-manager repository-name newTypeDef)))
+    (binding [om/*context* context]
+      (store/persist-type-def xtdb-node (datafy newTypeDef)))))
 
-(defn -addAttributeTypeDef [this
-                            ^String userId
-                            ^AttributeTypeDef newAttributeTypeDef]
+(defn -addAttributeTypeDef
+  [this userId newAttributeTypeDef]
   (let [{:keys [xtdb-node
-                repository-content-manager
-                repository-name]} @(.state this)
-        incoming (datafy newAttributeTypeDef)]
+                context]} @(.state this)]
     (.superAddAttributeTypeDef this userId newAttributeTypeDef)
-    (store-attribute-type-def xtdb-node incoming)
-    (.addAttributeTypeDef repository-content-manager repository-name newAttributeTypeDef)))
+    (binding [om/*context* context]
+      (store/persist-attribute-type-def xtdb-node (datafy newAttributeTypeDef)))))
 
-(defn ^TypeDef -updateTypeDef [this
-                               ^String userId
-                               ^TypeDefPatch typeDefPatch]
+(defn ^TypeDef -updateTypeDef
+  [this userId typeDefPatch]
   (let [{:keys [xtdb-node
-                repository-content-manager
-                repository-name]} @(.state this)
-        type-def-obj (.superUpdateTypeDef this userId typeDefPatch)
-        incoming     (datafy type-def-obj)]
-    (store-type-def xtdb-node incoming)
-    (.updateTypeDef repository-content-manager repository-name type-def-obj)
-    type-def-obj))
+                context]} @(.state this)
+        updated (.superUpdateTypeDef this userId typeDefPatch)]
+    (binding [om/*context* context]
+      (store/persist-type-def xtdb-node (datafy updated)))))
 
-(defn -deleteTypeDef [this
-                      ^String userId
-                      ^String obsoleteTypeDefGUID
-                      ^String obsoleteTypeDefName]
+(defn -deleteTypeDef
+  [this userId obsoleteTypeDefGUID obsoleteTypeDefName]
   (.superDeleteTypeDef this userId obsoleteTypeDefGUID obsoleteTypeDefName))
 
-(defn -deleteAttributeTypeDef [this
-                               ^String userId
-                               ^String obsoleteTypeDefGUID
-                               ^String obsoleteTypeDefName]
+(defn -deleteAttributeTypeDef
+  [this userId obsoleteTypeDefGUID obsoleteTypeDefName]
   (.superDeleteAttributeTypeDef this userId obsoleteTypeDefGUID obsoleteTypeDefName))
 
-(defn ^TypeDef -reIdentifyTypeDef [this
-                                   ^String userId
-                                   ^String originalTypeDefGUID
-                                   ^String originalTypeDefName
-                                   ^String newTypeDefGUID
-                                   ^String newTypeDefName]
-  (.superReIdentifyTypeDef this userId originalTypeDefGUID originalTypeDefName
-    newTypeDefGUID newTypeDefName))
+(defn ^TypeDef -reIdentifyTypeDef
+  [this userId originalTypeDefGUID originalTypeDefName newTypeDefGUID newTypeDefName]
+  (.superReIdentifyTypeDef this userId originalTypeDefGUID originalTypeDefName newTypeDefGUID newTypeDefName))
 
-(defn ^AttributeTypeDef -reIdentifyAttributeTypeDef [this
-                                                     ^String userId
-                                                     ^String originalAttributeTypeDefGUID
-                                                     ^String originalAttributeTypeDefName
-                                                     ^String newAttributeTypeDefGUID
-                                                     ^String newAttributeTypeDefName]
-  (.superReIdentifyAttribtueTypeDef this userId originalAttributeTypeDefGUID
-    originalAttributeTypeDefName newAttributeTypeDefGUID newAttributeTypeDefName))
+(defn ^AttributeTypeDef -reIdentifyAttributeTypeDef
+  [this userId originalAttributeTypeDefGUID originalAttributeTypeDefName newAttributeTypeDefGUID newAttributeTypeDefName]
+  (.superReIdentifyAttribtueTypeDef this userId originalAttributeTypeDefGUID originalAttributeTypeDefName
+    newAttributeTypeDefGUID newAttributeTypeDefName))
 
-(defn ^EntityDetail -isEntityKnown [this
-                                    ^String userId
-                                    ^String guid]
-  nil)
+(defn ^EntityDetail -isEntityKnown
+  [this userId guid]
+  (.superGetInstanceParameterValidation this userId guid "isEntityKnown")
+  (let [{:keys [xtdb-node
+                context]} @(.state this)
+        entity (store/fetch-entity-by-guid xtdb-node guid)]
+    (when entity
+      (binding [om/*context* context]
+        (om-datafy/map->EntityDetail entity)))))
 
-(defn ^EntitySummary -getEntitySummary [this
-                                        ^String userId
-                                        ^String guid]
-  nil)
+(defn ^EntitySummary -getEntitySummary
+  [this userId guid]
+  (.superGetInstanceParameterValidation this userId guid "getEntitySummary")
+  (let [{:keys [xtdb-node
+                context]} @(.state this)
+        entity (store/fetch-entity-by-guid xtdb-node guid)]
+    (when entity
+      (binding [om/*context* context]
+        (om-datafy/map->EntitySummary entity)))))
 
 (defn ^EntityDetail -getEntityDetail
-  ([this ^String userId ^String guid]
-   (-getEntityDetail this userId guid nil))
-  ([this ^String userId ^String guid ^Date asOfTime]
-   (let [valid-time (or asOfTime
-                      (Date.))]
-     nil)))
+  ([this userId guid]
+   (-getEntityDetail this userId guid (Date.)))
+  ([this userId guid valid-time]
+   (.superGetInstanceParameterValidation this userId guid "getEntityDetail")
+   (tap> guid)
+   (let [{:keys [xtdb-node context]} @(.state this)]
+     (binding [om/*context* context]
+       (if-let [entity (store/fetch-entity-by-guid xtdb-node guid valid-time)]
+         (do
+           (tap> entity)
+           (om-datafy/map->EntityDetail entity)))))))
 
 (defn -getEntityDetailHistory [this
                                ^String userId
@@ -440,30 +316,86 @@
                            pageSize]
   (Collections/EMPTY_LIST))
 
-(defn -addEntity [this
-                  ^String userId
-                  ^String entityTypeGUID
-                  ^InstanceProperties initialProperties
-                  ^List initialClassifications
-                  ^InstanceStatus initialStatus]
-  nil)
+(defn- random-uuid-str []
+  (str (java.util.UUID/randomUUID)))
+
+(defn add-entity [this user-id type-def properties classifications status]
+  (let [{:keys [metadata-collection-id
+                metadata-collection-name
+                context
+                xtdb-node]} @(.state this)
+        type-def-guid  (:openmetadata.TypeDef/guid type-def)
+        entity-summary {:openmetadata.Entity/type                   type-def-guid
+                        :openmetadata.Entity/headerVersion          1
+                        :openmetadata.Entity/version                1
+                        :openmetadata.Entity/metadataCollectionId   metadata-collection-id
+                        :openmetadata.Entity/metadataCollectionName metadata-collection-name
+                        :openmetadata.Entity/createdBy              user-id
+                        :openmetadata.Entity/createTime             (Date.)
+                        :openmetadata.Entity/instanceProvenanceType (.name InstanceProvenanceType/LOCAL_COHORT)
+                        :openmetadata.Entity/classifications        classifications
+                        :openmetadata.Entity/status                 status
+                        :openmetadata.Entity/guid                   (random-uuid-str)}
+        entity         (merge entity-summary
+                         properties)]
+    (binding [om/*context* context]
+      (store/persist-entity xtdb-node entity)
+      (xt/sync xtdb-node)
+      entity)))
+
+(defn ^EntityDetail -addEntity
+  [this userId entityTypeGUID properties classifications initialStatus]
+  (.superAddEntityParameterValidation this userId, entityTypeGUID, properties, classifications, initialStatus,
+    "addEntity")
+  (let [{:keys [context]} @(.state this)]
+    (binding [om/*context* context]
+      (let [type-def            (om/find-type-def-by-guid entityTypeGUID)
+            instance-properties (om-datafy/instance-properties->map type-def properties)
+            classifications     (mapv datafy classifications)
+            status              (.name initialStatus)
+            entity              (add-entity this userId type-def instance-properties classifications status)]
+        (om-datafy/map->EntityDetail entity)))))
 
 (defn -addEntityProxy [this
                        ^String userId
                        ^EntityProxy entityProxy]
   nil)
 
-(defn -updateEntityStatus [this
-                           ^String userId
-                           ^String entityGUID
-                           ^InstanceStatus newStatus]
-  nil)
+(defn -updateEntityStatus
+  [this userId entityGUID newStatus]
+  (.superUpdateInstanceStatusParameterValidation this userId entityGUID newStatus "updateEntityStatus")
+  (let [{:keys [xtdb-node
+                context]} @(.state this)]
+    (binding [om/*context* context]
+      (let [entity (some-> (store/fetch-entity-by-guid xtdb-node entityGUID)
+                     (assoc :openmetadata.Entity/status (.name newStatus))
+                     (assoc :openmetadata.Entity/updateTime (Date.))
+                     (assoc :openmetadata.Entity/updatedBy userId)
+                     (update-in [:openmetadata.Entity/version] inc))]
+        (when entity
+          (store/persist-entity xtdb-node (datafy entity))
+          (xt/sync xtdb-node)
+          (om-datafy/map->EntityDetail entity))))))
 
-(defn -updateEntityProperties [this
-                               ^String userId
-                               ^String entityGUID
-                               ^InstanceProperties properties]
-  nil)
+(defn -updateEntityProperties
+  [this userId entityGUID properties]
+  (let [{:keys [xtdb-node
+                context]} @(.state this)]
+    (binding [om/*context* context]
+      (let [entity        (store/fetch-entity-by-guid xtdb-node entityGUID)
+            type-def-guid (:openmetadata.Entity/type entity)
+            type-def      (some-> type-def-guid om/find-type-def-by-guid)
+            prop-map      (when type-def
+                            (om-datafy/instance-properties->map type-def properties))
+            entity        (some-> entity
+                            (merge prop-map)
+                            (assoc :openmetadata.Entity/updateTime (Date.))
+                            (assoc :openmetadata.Entity/updatedBy userId)
+                            (update-in [:openmetadata.Entity/version] inc))]
+        (tap> prop-map)
+        (when entity
+          (store/persist-entity xtdb-node (datafy entity))
+          (om-datafy/map->EntityDetail entity))))))
 
 (defn -undoEntityUpdate [this
                          ^String userId

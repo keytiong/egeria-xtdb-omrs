@@ -1,59 +1,37 @@
 (ns io.kosong.egeria.omrs-test
   (:use [midje.sweet])
-  (:require [io.kosong.egeria.omrs :as omrs]
+  (:require [io.kosong.egeria.omrs :as om]
             [io.kosong.egeria.omrs.datafy :as omrs-datafy]
-            [clojure.datafy :refer [datafy]])
-  (:import (org.odpi.openmetadata.repositoryservices.connectors.stores.metadatacollectionstore.properties.instances InstanceProvenanceType InstanceProperties ClassificationOrigin)
-           (org.odpi.openmetadata.repositoryservices.connectors.stores.metadatacollectionstore.repositoryconnector OMRSRepositoryHelper)))
+            [clojure.datafy :refer [datafy]]
+            [dev]
+            [integrant.core :as ig])
+  (:import (org.odpi.openmetadata.repositoryservices.connectors.stores.metadatacollectionstore.properties.instances InstanceProvenanceType InstanceProperties ClassificationOrigin)))
 
-(def server-name "omrs-test-server")
-(def server-type "Open Metadata Repository Service")
-(def organization "kosong.io")
+
+(def system
+  (ig/init dev/dev-config))
+
+(def server-name (-> system :dev/repository-config :server-name))
+
 (def user-id "garygeeke")
-(def component-id 1001)
-(def component-name "Egeria XTDB Open Metadata Repository Service")
-(def component-description "Egeria XTDB Open Metadata Repository Service")
-(def component-wiki-url "https://github.com/keytiong")
 
-(def source-name "omrs-test")
-(def metadata-collection-id "3750803c-0566-4e8b-ac2a-5b551bd152ac")
-(def metadata-collection-name "omrs-unitest-metadata-collection")
+(def metadata-collection-id
+  (-> system :dev/repository-config :metadata-collection-id))
 
-(def audit-log-store
-  (omrs/->null-audit-log-store))
+(def metadata-collection-name
+  (-> system :dev/repository-config :metadata-collection-name))
 
-(def audit-log-destination
-  (omrs/->audit-log-destination {:audit-log-stores [audit-log-store]
-                                 :server-name      server-name
-                                 :server-type      server-type
-                                 :organization     organization}))
+(dev/load-openmetadata-types system)
 
-(def audit-log
-  (omrs/->audit-log {:audit-log-destination audit-log-destination
-                     :component-id          component-id
-                     :component-name        component-name
-                     :component-description component-description
-                     :component-wiki-url    component-wiki-url}))
+(om/set-context! (dev/context system))
 
-(def openmetadata-types-archive
-  (omrs/->openmetadata-types-archive))
-
-(def repo-content-manager
-  (omrs/->repository-content-manager {:user-id   user-id
-                                      :audit-log audit-log}))
-
-(def ^OMRSRepositoryHelper repo-helper
-  (omrs/->repository-helper {:content-manager repo-content-manager}))
-
-(omrs/set-repo-helper! repo-helper)
-
-(omrs/init-repo-content-manager repo-content-manager openmetadata-types-archive user-id)
+(def repository-content-helper (:dev/repository-content-helper system))
 
 (defn- attribute-type-def-by-name [name]
-  (.getAttributeTypeDefByName repo-helper "omrs-test" name))
+  (.getAttributeTypeDefByName repository-content-helper server-name name))
 
 (defn- type-def-by-name [name]
-  (.getTypeDefByName repo-helper "omrs-test" name))
+  (.getTypeDefByName repository-content-helper server-name name))
 
 
 (let [last-attachment-type-def      (type-def-by-name "LastAttachment")
@@ -104,10 +82,6 @@
 (def anchors-type-def
   (type-def-by-name "Anchors"))
 
-(comment
-  (datafy (type-def-by-name "Asset"))
-  *e)
-
 (facts "Datafy PrimitiveDef"
   (let [datafied (datafy primitive-string-def)]
     (fact
@@ -134,7 +108,7 @@
       =>
       "OM_PRIMITIVE_TYPE_STRING")))
 
-(doseq [type-def (.getKnownTypeDefs repo-helper)]
+(doseq [type-def (.getKnownTypeDefs (dev/repository-content-helper system))]
   (fact
     (-> type-def
       datafy
@@ -142,7 +116,7 @@
     =>
     type-def))
 
-(doseq [attr-type-def (.getKnownAttributeTypeDefs repo-helper)]
+(doseq [attr-type-def (.getKnownAttributeTypeDefs (dev/repository-content-helper system))]
   (fact
     (-> attr-type-def
       datafy
@@ -150,7 +124,7 @@
     =>
     attr-type-def))
 
-(def anchor-classification (.getNewClassification repo-helper
+(def anchor-classification (.getNewClassification (dev/repository-content-helper system)
                              "omrs-test"                                        ; sourceName
                              metadata-collection-id
                              metadata-collection-name
@@ -164,15 +138,15 @@
 
 (def asset-entity
   (let [props (let [p (InstanceProperties.)]
-                (.addStringPropertyToInstance repo-helper
-                  source-name
+                (.addStringPropertyToInstance repository-content-helper
+                  server-name
                   p
                   "name"
                   "foo"
                   "test-1")
                 p)]
-    (.getNewEntity repo-helper
-      source-name
+    (.getNewEntity repository-content-helper
+      server-name
       metadata-collection-id
       metadata-collection-name
       InstanceProvenanceType/LOCAL_COHORT
@@ -194,8 +168,8 @@
     omrs-datafy/map->EntityDetail)
   => asset-entity)
 
-(def foreign-key-relationship (.getNewRelationship repo-helper
-                                source-name
+(def foreign-key-relationship (.getNewRelationship repository-content-helper
+                                server-name
                                 metadata-collection-id
                                 metadata-collection-name
                                 InstanceProvenanceType/LOCAL_COHORT
@@ -209,6 +183,6 @@
     omrs-datafy/map->Relationship)
   => foreign-key-relationship)
 
-
+(ig/halt! system)
 
 

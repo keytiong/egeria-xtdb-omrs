@@ -2,164 +2,128 @@
   (:require [clojure.string :as str]
             [clojure.core.protocols :as p]
             [clojure.datafy :refer [datafy]]
-            [clojure.tools.logging :as log])
-  (:import (java.util LinkedList UUID)
-           (org.odpi.openmetadata.repositoryservices.localrepository.repositorycontentmanager OMRSRepositoryContentHelper OMRSRepositoryContentManager OMRSRepositoryContentValidator)
-           (org.odpi.openmetadata.repositoryservices.connectors.stores.metadatacollectionstore.properties.typedefs TypeDefPatch)
-           (org.odpi.openmetadata.opentypes OpenMetadataTypesArchive)
-           (org.odpi.openmetadata.repositoryservices.connectors.stores.auditlogstore OMRSAuditLogRecord OMRSAuditLogStore)
-           (org.odpi.openmetadata.repositoryservices.auditlog OMRSAuditLogDestination OMRSAuditLog)
-           (org.odpi.openmetadata.repositoryservices.connectors.stores.archivestore.properties OpenMetadataArchiveTypeStore OpenMetadataArchive)
-           (org.odpi.openmetadata.repositoryservices.connectors.stores.metadatacollectionstore.utilities OMRSRepositoryPropertiesUtilities)))
+            [clojure.tools.logging :as log]
+            [io.kosong.egeria.omrs.protocols :as om-p]
+            [io.kosong.egeria.omrs.xtdb.metadata-store]
+            [io.kosong.egeria.omrs.xtdb.metadata-store :as store])
+  (:import (java.util Date)))
 
-(defonce ^:dynamic *repo-helper* nil)
+(defonce ^:dynamic *context* nil)
 
-(defn set-repo-helper! [repo-helper]
-  (alter-var-root #'*repo-helper* (constantly repo-helper)))
+(defn ->context [{:keys [type-store instance-store]}]
+  {:type-store     type-store
+   :instance-store instance-store})
 
-(defn find-type-def-by-guid
-  ([type-def-guid]
-   (find-type-def-by-guid *repo-helper* type-def-guid))
-  ([^OMRSRepositoryContentHelper repo-helper type-def-guid]
-   (if-let [type-def (.getTypeDef repo-helper "omrs" "guid" type-def-guid "find-type-def-by-guid")]
-     (datafy type-def))))
-
-(defn find-type-def-by-name
-  ([type-def-name]
-   (find-type-def-by-name *repo-helper* type-def-name))
-  ([^OMRSRepositoryContentHelper repo-helper type-def-name]
-   (if-let [type-def (.getTypeDefByName repo-helper "omrs" type-def-name)]
-     (datafy type-def))))
-
-(defn find-attribute-type-def-by-guid
-  ([attribute-type-guid]
-   (find-attribute-type-def-by-guid *repo-helper* attribute-type-guid))
-  ([^OMRSRepositoryContentHelper repo-helper attribute-type-guid]
-   (datafy (.getAttributeTypeDef repo-helper
-             "local"
-             attribute-type-guid
-             "find-attribute-type-def-by-guid"))))
-
-(defn find-type-def-ancestors
-  ([type-def]
-   (loop [as [] t type-def]
-     (let [parent-type-def (some-> t
-                             :openmetadata.TypeDef/superType
-                             find-type-def-by-guid)]
-       (if parent-type-def
-         (recur (conj as parent-type-def) parent-type-def)
-         as)))))
-
-(defn list-type-def-attributes
-  "Resolves properties of the given type-def and its super type. Returns a sequence of type def attributes."
-  ([type-def]
-   (list-type-def-attributes *repo-helper* type-def))
-  ([^OMRSRepositoryContentHelper repo-helper type-def]
-   (let [type-def-guid   (:openmetadata.TypeDef/guid type-def)
-         type-def-name   (:openmetadata.TypeDef/name type-def)
-         super-type-guid (:openmetadata.TypeDef/superType type-def)
-         super-type-def  (when super-type-guid
-                           (find-type-def-by-guid repo-helper super-type-guid))
-         attrs           (->> (:openmetadata.TypeDef/propertiesDefinition type-def)
-                           (map #(assoc % :openmetadata.TypeDef/name type-def-name))
-                           (map #(assoc % :openmetadata.TypeDef/guid type-def-guid)))]
-     (if super-type-def
-       (concat (list-type-def-attributes repo-helper super-type-def) attrs)
-       attrs))))
-
-(defn find-entity-by-guid [guid]
+(defn set-context! [context]
+  (alter-var-root #'*context* (constantly context))
   nil)
 
-(defn qualify-property-key [attr]
-  (let [ns   (str "openmetadata." (:openmetadata.TypeDef/name attr))
-        name (:openmetadata.TypeDefAttribute/attributeName attr)]
-    (keyword ns name)))
+(defn find-type-def-by-guid
+  [guid]
+  (if-let [type-store (:type-store *context*)]
+    (p/datafy (om-p/fetch-type-def-by-guid type-store guid))))
 
-(defn list-type-def-property-keys
-  ([type-def]
-   (list-type-def-property-keys *repo-helper* type-def))
-  ([^OMRSRepositoryContentHelper repo-helper type-def]
-   (let [attrs (list-type-def-attributes repo-helper type-def)]
-     (map qualify-property-key attrs))))
+(defn find-type-def-by-name
+  [type-def-name]
+  (if-let [type-store (:type-store *context*)]
+    (p/datafy (om-p/fetch-type-def-by-name type-store type-def-name))))
+
+(defn find-attribute-type-def-by-guid
+  [guid]
+  (let [type-store (:type-store *context*)]
+    (p/datafy (om-p/fetch-attribute-type-def-by-guid type-store guid))))
+
+(defn find-type-def-ancestors
+  [type-def]
+  (loop [ts [] t type-def]
+    (let [parent (some-> t
+                   :openmetadata.TypeDef/superType
+                   find-type-def-by-guid)]
+      (if parent
+        (recur (conj ts parent) parent)
+        ts))))
 
 (defn list-type-defs
-  ([]
-   (list-type-defs *repo-helper*))
-  ([^OMRSRepositoryContentHelper repo-helper]
-   (map datafy (.getKnownTypeDefs repo-helper))))
-
-(def find-enum-element-def
-  (memoize
-    (fn [enum-type-def enum-name]
-      (some->> (:openmetadata.EnumDef/elementDefs enum-type-def)
-        (filter (fn [x] (= (:openmetadata.EnumElementDef/value x) enum-name)))
-        (first)))))
-
-(defn ^OpenMetadataArchive ->openmetadata-types-archive
   []
-  (-> (OpenMetadataTypesArchive.)
-    (.getOpenMetadataArchive)))
+  (if-let [type-store (:type-store *context*)]
+    (p/datafy (om-p/list-type-defs type-store))))
 
-(defn ->console-audit-log-store
+(defn list-attribute-type-defs
   []
-  (proxy [OMRSAuditLogStore] []
-    (storeLogRecord [^OMRSAuditLogRecord record]
-      (log/info record))))
+  (if-let [type-store (:type-store *context*)]
+    (p/datafy (om-p/list-attribute-type-defs type-store))))
 
-(defn ->null-audit-log-store
-  []
-  (proxy [OMRSAuditLogStore] []))
+(defn find-entity-by-guid [guid]
+  [guid]
+  (if-let [instance-store (:instance-store *context*)]
+    (p/datafy (om-p/fetch-entity-by-guid instance-store guid))))
 
-(defn ->audit-log-destination
-  [{:keys [audit-log-stores
-           server-name
-           server-type
-           organization]}]
-  (OMRSAuditLogDestination. server-name server-type organization (LinkedList. audit-log-stores)))
+(defn- qualify-attribute-name-with-type [type-def attr-def]
+  (let [ns   (str "openmetadata." (:openmetadata.TypeDef/name type-def))
+        name (:openmetadata.TypeDefAttribute/attributeName attr-def)]
+    (keyword ns name)))
 
-(defn ->audit-log
-  [{:keys [audit-log-destination
-           component-id
-           component-name
-           component-description
-           component-wiki-url]}]
-  (OMRSAuditLog. audit-log-destination
-    component-id
-    component-name
-    component-description
-    component-wiki-url))
+(defn- deduplicate-overridden-attribute-names [type-def-attribute-pairs]
+  (->> type-def-attribute-pairs
+    (reduce (fn [m [type-def attr-type-def :as pair]]
+              (let [k (:openmetadata.TypeDefAttribute/attributeName attr-type-def)]
+                (assoc m k pair)))
+      {})
+    (vals)))
 
-(defn ->repository-validator
-  [{:keys [content-manager]}]
-  (OMRSRepositoryContentValidator. content-manager))
+(defn- all-type-def-attributes [type-def]
+  (->> (find-type-def-ancestors type-def)
+    (cons type-def)
+    (reverse)
+    (mapcat (fn [type-def]
+              (map (fn [attr-type-def]
+                     [type-def attr-type-def])
+                (:openmetadata.TypeDef/propertiesDefinition type-def))))
+    deduplicate-overridden-attribute-names))
 
-(defn ->repository-helper
-  [{:keys [content-manager]}]
-  (let [helper (OMRSRepositoryContentHelper. content-manager)]
-    helper))
+(defn type-def-attribute-key->attribute [type-def]
+  (reduce (fn [m [type-def type-def-attr]]
+            (let [k (qualify-attribute-name-with-type type-def type-def-attr)]
+              (assoc m k type-def-attr)))
+    {}
+    (all-type-def-attributes type-def)))
 
-(defn init-repo-content-manager
-  [^OMRSRepositoryContentManager repo-content-manager archive user-id]
-  (let [archive-type-store (.getArchiveTypeStore archive)
-        repo-util          (OMRSRepositoryPropertiesUtilities.)
-        archive-guid       (some-> (.getArchiveProperties archive)
-                             (.getArchiveGUID))
-        name-type-def-map  (transient {})]
-    (.setOpenMetadataTypesOriginGUID repo-content-manager archive-guid)
-    (doseq [attribute-type-def (.getAttributeTypeDefs archive-type-store)]
-      (.addAttributeTypeDef repo-content-manager user-id attribute-type-def))
-    (doseq [type-def (.getNewTypeDefs archive-type-store)]
-      (.addTypeDef repo-content-manager user-id type-def)
-      (assoc! name-type-def-map (.getName type-def) type-def))
-    (doseq [^TypeDefPatch patch (.getTypeDefPatches archive-type-store)]
-      (let [type-def-name     (.getTypeDefName patch)
-            original-type-def (get name-type-def-map type-def-name)]
-        (if original-type-def
-          (let [updated-type-def (.applyPatch repo-util "" original-type-def patch "")]
-            (assoc! name-type-def-map type-def-name updated-type-def)
-            (.updateTypeDef repo-content-manager "" updated-type-def)))))))
+(defn attribute-keys [type-def]
+  (->> (type-def-attribute-key->attribute type-def)
+    (keys)))
 
-(defn ^OMRSRepositoryContentManager ->repository-content-manager
-  [{:keys [user-id
-           audit-log]}]
-  (OMRSRepositoryContentManager. user-id audit-log))
+(defn skeleton-entity
+  [{:keys [guid metadata-collection-id metadata-collection-name instance-provenance-type
+           user-name type-name]}]
+  (let [type-def       (find-type-def-by-name type-name)
+        type-def-guid  (:openmetadata.TypeDef/guid type-def)
+        initial-status (:openmetadata.TypeDef/initialStatus type-def)]
+    (when type-def
+      {:openmetadata.Entity/headerVersion          1
+       :openmetadata.Entity/instanceProvenanceType instance-provenance-type
+       :openmetadata.Entity/metadataCollectionId   metadata-collection-id
+       :openmetadata.Entity/metadataCollectionName metadata-collection-name
+       :openmetadata.Entity/guid                   guid
+       :openmetadata.Entity/createTime             (Date.)
+       :openmetadata.Entity/version                1
+       :openmetadata.Entity/type                   type-def-guid
+       :openmetadata.Entity/status                 initial-status
+       :openmetadata.Entity/createdBy              user-name})))
+
+(defn skeleton-classification
+  [{:keys [metadata-collection-id metadata-collection-name instance-provenance-type
+           user-name type-name]}]
+  (let [type-def       (find-type-def-by-name type-name)
+        type-def-guid  (:openmetadata.TypeDef/guid type-def)
+        initial-status (:openmetadata.TypeDef/initialStatus type-def)]
+    (when type-def
+      {:openmetadata.Classification/headerVersion          1
+       :openmetadata.Classification/instanceProvenanceType instance-provenance-type
+       :openmetadata.Classification/metadataCollectionId   metadata-collection-id
+       :openmetadata.Classification/metadataCollectionName metadata-collection-name
+       :openmetadata.Classification/createTime             (Date.)
+       :openmetadata.Classification/version                1
+       :openmetadata.Classification/name                   (:openmetadata.TypeDef/name type-def)
+       :openmetadata.Classification/type                   type-def-guid
+       :openmetadata.Classification/status                 initial-status
+       :openmetadata.Classification/createdBy              user-name})))

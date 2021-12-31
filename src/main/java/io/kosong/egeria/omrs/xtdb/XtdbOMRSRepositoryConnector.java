@@ -28,6 +28,10 @@ public class XtdbOMRSRepositoryConnector extends OMRSRepositoryConnector
 
     private static final String XTDB_METADATA_COLLECTION_CLASS_NAME = "io.kosong.egeria.omrs.xtdb.XtdbOMRSMetadataCollection";
 
+    private static final String XTDB_CONFIG_FILE_PATH = "xtdbConfigPath";
+
+    private static final Duration DEFAULT_XTDB_STARTUP_SYNC_DURATION = Duration.ofSeconds(60);
+
     private IXtdb xtdbNode;
 
     /**
@@ -45,6 +49,14 @@ public class XtdbOMRSRepositoryConnector extends OMRSRepositoryConnector
 
         String methodName = "getMetadataCollection";
 
+        if (!isActive()) {
+            try {
+                this.start();
+            } catch (ConnectorCheckedException e) {
+                throw new RepositoryErrorException(e);
+            }
+        }
+
         if (metadataCollection == null) {
             throw new OMRSLogicErrorException(OMRSErrorCode.NULL_METADATA_COLLECTION.getMessageDefinition(repositoryName),
                     this.getClass().getName(),
@@ -55,28 +67,30 @@ public class XtdbOMRSRepositoryConnector extends OMRSRepositoryConnector
     }
 
     @Override
-    public void start() throws ConnectorCheckedException {
-        String methodName = "start";
+    public synchronized void start() throws ConnectorCheckedException {
+        if (!isActive()) {
+            startXtdbNode();
+            initMetadataCollection();
+        }
         super.start();
-        startXtdbNode();
-        initMetadataCollection();
     }
 
     private void initMetadataCollection() throws ConnectorCheckedException {
         String methodName = "initMetadataCollection";
         if (metadataCollectionId != null) {
             try {
-                Class clazz = Class.forName(XTDB_METADATA_COLLECTION_CLASS_NAME);
-                Constructor constructor = clazz.getConstructor(
+                Class<? extends OMRSMetadataCollection> clazz = Class.forName(XTDB_METADATA_COLLECTION_CLASS_NAME).asSubclass(OMRSMetadataCollection.class);
+
+                Constructor<? extends OMRSMetadataCollection> constructor = clazz.getConstructor(
                         XtdbOMRSRepositoryConnector.class,
                         String.class,
                         OMRSRepositoryHelper.class,
                         OMRSRepositoryValidator.class,
                         String.class,
                         AuditLog.class);
-                Object obj = constructor.newInstance(this, repositoryName, repositoryHelper,
+
+                metadataCollection = constructor.newInstance(this, repositoryName, repositoryHelper,
                         repositoryValidator, metadataCollectionId, auditLog);
-                metadataCollection = OMRSMetadataCollection.class.cast(obj);
             } catch (Throwable t) {
                 ExceptionMessageDefinition messageDefinition = OMRSErrorCode.UNEXPECTED_EXCEPTION.getMessageDefinition();
                 throw new ConnectorCheckedException(messageDefinition, this.getClass().getName(), methodName, t);
@@ -89,23 +103,29 @@ public class XtdbOMRSRepositoryConnector extends OMRSRepositoryConnector
     }
 
     private void startXtdbNode() throws ConnectorCheckedException {
+
+        String methodName = "startXtdbNode";
+
         ConnectionProperties connectionProperties = getConnection();
 
         Map<String,Object> configProps = connectionProperties.getConfigurationProperties();
 
-        String xtdbConfigPath = null;
-        xtdbConfigPath = (String) configProps.get("xtdbConfigPath");
+        String xtdbConfigPath = (String) configProps.get(XTDB_CONFIG_FILE_PATH);
 
-        if (xtdbConfigPath == null) {
-            xtdbConfigPath = "data/xtdb-node.edn";
+        File configFile = null;
+
+        if (xtdbConfigPath != null) {
+            new File(xtdbConfigPath);
         }
 
-        File configFile = new File(xtdbConfigPath);
-        String methodName = "startXtdbNode";
         if (xtdbNode == null) {
             try {
-                xtdbNode = IXtdb.startNode(configFile);
-                xtdbNode.sync(Duration.ofMillis(60000));
+                if (configFile != null) {
+                    xtdbNode = IXtdb.startNode(configFile);
+                } else {
+                    xtdbNode = IXtdb.startNode();
+                }
+                xtdbNode.sync(DEFAULT_XTDB_STARTUP_SYNC_DURATION);
             } catch (Throwable t) {
                 ExceptionMessageDefinition messageDefinition = OMRSErrorCode.UNEXPECTED_EXCEPTION.getMessageDefinition();
                 throw new ConnectorCheckedException(messageDefinition, this.getClass().getName(), methodName, t);

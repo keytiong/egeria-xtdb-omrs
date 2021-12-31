@@ -502,13 +502,13 @@
 ;; Data navigation functions
 ;;
 
-(defmulti navigate (fn [_ _ k _] k))
+(defmulti navigate (fn [_ k _] k))
 
-(defn- nav-attribute-type-def [repository-helper guid]
+(defn- nav-attribute-type-def [guid]
   (when guid
     (omrs/find-attribute-type-def-by-guid guid)))
 
-(defn- nav-type-def [repository-helper guid]
+(defn- nav-type-def [guid]
   (when guid
     (omrs/find-type-def-by-guid guid)))
 
@@ -519,40 +519,35 @@
 (defn- nav-classification [guid])
 
 (defmethod navigate :openmetadata.TypeDefAttribute/attributeType
-  [{:keys [repository-helper]} coll k v]
-  (nav-attribute-type-def repository-helper v))
+  [coll k v]
+  (nav-attribute-type-def v))
 
 (defmethod navigate :openmetadata.RelationshipEndDef/entityType
-  [{:keys [repository-helper]} coll k v]
-  (nav-type-def repository-helper v))
+  [coll k v]
+  (nav-type-def v))
 
 (defmethod navigate :openmetadata.TypeDef/superType
-  [{:keys [repository-helper]} coll k v]
-  (nav-type-def repository-helper v))
+  [coll k v]
+  (nav-type-def v))
 
 (defmethod navigate :openmetadata.ClassificationDef/validEntityDefs
-  [{:keys [repository-helper]} coll k v]
+  [coll k v]
   (->> v
-    (mapv #(nav-type-def repository-helper %))))
+    (mapv #(nav-type-def %))))
 
 (defmethod navigate :openmetadata.Classification/type
-  [{:keys [repository-helper]} coll k v]
-  (nav-type-def repository-helper v))
+  [coll k v]
+  (nav-type-def v))
 
 (defmethod navigate :openmetadata.Entity/type
-  [{:keys [repository-helper]} coll k v]
-  (nav-type-def repository-helper v))
+  [coll k v]
+  (nav-type-def v))
 
 (defmethod navigate :openmetadata.Relationship/type
-  [{:keys [repository-helper]} coll k v]
-  (nav-type-def repository-helper v))
+  [coll k v]
+  (nav-type-def v))
 
-(defmethod navigate :default [_ coll _ v] v)
-
-(defn- omrs-navigator []
-  (let [omrs {:repository-helper omrs/*repo-helper*}]
-    (fn [coll k v]
-      (navigate omrs coll k v))))
+(defmethod navigate :default [coll k v] v)
 
 ;;
 ;; Egeria->Data
@@ -560,7 +555,7 @@
 
 (defn- datafy-egeria [kfs o]
   (let [v (reduce-kv (fn [m k f] (assoc m k (f o))) {} kfs)]
-    (vary-meta v assoc `p/nav (omrs-navigator))))
+    v))
 
 (extend-type PrimitivePropertyValue
   p/Datafiable
@@ -643,32 +638,15 @@
   (datafy [^EnumPropertyValue o]
     (.getSymbolicName o)))
 
-(defn- valid-type-def-attributes [type-def]
-  (->> (omrs/find-type-def-ancestors type-def)
-    (cons type-def)
-    (reverse)
-    (mapcat (fn [type-def]
-              (map (fn [attr-type-def]
-                     [type-def attr-type-def])
-                (:openmetadata.TypeDef/propertiesDefinition type-def))))
-    (reduce (fn [m [type-def attr-type-def :as v]]
-              (let [k (:openmetadata.TypeDefAttribute/attributeName attr-type-def)]
-                (assoc m k v))) {})
-    (vals)))
-
-(defn- ->fully-qualifed-attribute-name [type-def attr-def]
-  (let [ns   (str "openmetadata." (:openmetadata.TypeDef/name type-def))
-        name (:openmetadata.TypeDefAttribute/attributeName attr-def)]
-    (keyword ns name)))
-
 (defn instance-properties->map [type-def ^InstanceProperties instance-props]
-  (let [name->attr-key (->> (valid-type-def-attributes type-def)
-                         (map #(apply ->fully-qualifed-attribute-name %))
-                         (reduce (fn [a kw] (assoc a (name kw) kw)) {}))]
-    (reduce (fn [m [name value]]
-              (assoc m (name->attr-key name) (datafy value)))
+  (let [attribute-keys (omrs/attribute-keys type-def)
+        props          (some-> instance-props .getInstanceProperties)]
+    (reduce (fn [m attribute-key]
+              (let [short-name (name attribute-key)
+                    v          (get props short-name)]
+                (assoc m attribute-key (datafy v))))
       {}
-      (some-> instance-props .getInstanceProperties))))
+      attribute-keys)))
 
 (extend-type Classification
   p/Datafiable
@@ -684,7 +662,7 @@
   p/Datafiable
   (datafy [^EntityDetail o]
     (let [props    (.getProperties o)
-          guid     (-> o .getType .getTypeDefGUID)
+          guid     (some-> o .getType .getTypeDefGUID)
           type-def (omrs/find-type-def-by-guid guid)]
       (merge
         (datafy-egeria entity-summary->map o)
@@ -694,17 +672,25 @@
   p/Datafiable
   (datafy [^EntityProxy o]
     (let [props    (.getUniqueProperties o)
-          guid     (-> o .getType .getTypeDefGUID)
+          guid     (some-> o .getType .getTypeDefGUID)
           type-def (omrs/find-type-def-by-guid guid)]
       (merge
         (datafy-egeria entity-proxy->map o)
         (instance-properties->map type-def props)))))
 
+(extend-type EntitySummary
+  p/Datafiable
+  (datafy [^EntitySummary o]
+    (let [guid     (some-> o .getType .getTypeDefGUID)
+          type-def (omrs/find-type-def-by-guid guid)]
+      (merge
+        (datafy-egeria entity-summary->map o)))))
+
 (extend-type Relationship
   p/Datafiable
   (datafy [^Relationship o]
     (let [props    (.getProperties o)
-          guid     (-> o .getType .getTypeDefGUID)
+          guid     (some-> o .getType .getTypeDefGUID)
           type-def (omrs/find-type-def-by-guid guid)]
       (merge
         (datafy-egeria relationship->map o)
@@ -715,7 +701,7 @@
 
 (defn- map->egeria [kfs o m]
   (reduce-kv (fn [o k f]
-               (let [v (p/nav m k (k m))]
+               (let [v (navigate m k (k m))]
                  (f o v)))
     o
     kfs))
@@ -767,6 +753,48 @@
 (defn map->ExternalStandardMappings [m]
   (map->egeria map->external-standard-mapping (ExternalStandardMapping.) m))
 
+(defmulti ->PrimitiveValue (fn [category value] category))
+
+(defmethod ->PrimitiveValue PrimitiveDefCategory/OM_PRIMITIVE_TYPE_BYTE
+  [category v]
+  (byte v))
+
+(defmethod ->PrimitiveValue PrimitiveDefCategory/OM_PRIMITIVE_TYPE_SHORT
+  [category v]
+  (short v))
+
+(defmethod ->PrimitiveValue PrimitiveDefCategory/OM_PRIMITIVE_TYPE_CHAR
+  [category v]
+  (char v))
+
+(defmethod ->PrimitiveValue PrimitiveDefCategory/OM_PRIMITIVE_TYPE_INT
+  [category v]
+  (int v))
+
+(defmethod ->PrimitiveValue PrimitiveDefCategory/OM_PRIMITIVE_TYPE_LONG
+  [category v]
+  (long v))
+
+(defmethod ->PrimitiveValue PrimitiveDefCategory/OM_PRIMITIVE_TYPE_FLOAT
+  [category v]
+  (float v))
+
+(defmethod ->PrimitiveValue PrimitiveDefCategory/OM_PRIMITIVE_TYPE_DOUBLE
+  [category v]
+  (double v))
+
+(defmethod ->PrimitiveValue PrimitiveDefCategory/OM_PRIMITIVE_TYPE_BIGINTEGER
+  [categroy v]
+  (BigInteger/valueOf v))
+
+(defmethod ->PrimitiveValue PrimitiveDefCategory/OM_PRIMITIVE_TYPE_BIGDECIMAL
+  [category v]
+  (BigDecimal/valueOf v))
+
+(defmethod ->PrimitiveValue :default
+  [category v]
+  v)
+
 (defmulti ->InstancePropertyValue
   (fn [attr-type-def v]
     (or
@@ -780,13 +808,14 @@
   (when v
     (let [primitive-def-category (some-> attr-type-def
                                    :openmetadata.PrimitiveDef/primitiveDefCategory
-                                   PrimitiveDefCategory/valueOf)]
+                                   PrimitiveDefCategory/valueOf)
+          primitive-value        (->PrimitiveValue primitive-def-category v)]
       (doto (PrimitivePropertyValue.)
         (.setTypeGUID (:openmetadata.AttributeTypeDef/guid attr-type-def))
         (.setTypeName (:openmetadata.AttributeTypeDef/name attr-type-def))
         (.setPrimitiveDefCategory primitive-def-category)
         (.setInstancePropertyCategory InstancePropertyCategory/PRIMITIVE)
-        (.setPrimitiveValue v)))))
+        (.setPrimitiveValue primitive-value)))))
 
 (defmethod ->InstancePropertyValue AttributeTypeDefCategory/ENUM_DEF
   [attr-type-def v]
@@ -831,28 +860,19 @@
         (.setMapValue pv (str k) (->InstancePropertyValue (second elem-types) x)))
       pv)))
 
-(defn attribute-key->attribute-type [type-def]
-  (reduce (fn [m [type-def type-def-attr]]
-            (let [k             (->fully-qualifed-attribute-name type-def type-def-attr)
-                  guid          (:openmetadata.TypeDefAttribute/attributeType type-def-attr)
-                  attr-type-def (omrs/find-attribute-type-def-by-guid guid)]
-              (assoc m k attr-type-def)))
-    {}
-    (valid-type-def-attributes type-def)))
-
 (defn map->InstanceProperties [type-def m]
-  (let [attr-key->type (attribute-key->attribute-type type-def)]
-    (reduce-kv (fn [o attr-key attr-type]
-                 (let [prop-name  (name attr-key)
-                       prop-value (some->> (attr-key m)
-                                    (->InstancePropertyValue attr-type))]
-                   (if prop-value
-                     (doto o (.setProperty prop-name prop-value))
-                     o)))
-      (InstanceProperties.)
-      attr-key->type)))
-
-
+  (->> (omrs/type-def-attribute-key->attribute type-def)
+    (map (fn [[attr-key type-def-attr]]
+           [attr-key
+            (-> (:openmetadata.TypeDefAttribute/attributeType type-def-attr)
+              omrs/find-attribute-type-def-by-guid)]))
+    (reduce (fn [^InstanceProperties o [attr-key attr-type-def]]
+              (let [property-name  (name attr-key)
+                    property-value (some->> (attr-key m) (->InstancePropertyValue attr-type-def))]
+                (if property-value
+                  (doto o (.setProperty property-name property-value))
+                  o)))
+      (InstanceProperties.))))
 
 (defn map->Classification [m]
   (let [^Classification o (map->egeria map->classification (Classification.) m)
@@ -877,7 +897,7 @@
 
 (defn map->InstanceType [m]
   (let [ancestors       (omrs/find-type-def-ancestors m)
-        type-attr-pairs (valid-type-def-attributes m)
+        type-attr-pairs (omrs/type-def-attribute-key->attribute m)
         attrs           (mapv second type-attr-pairs)
         m               (-> m
                           (assoc :openmetadata.TypeDef/ancestorTypes ancestors)
