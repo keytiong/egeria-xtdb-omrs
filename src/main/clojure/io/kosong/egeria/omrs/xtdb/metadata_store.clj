@@ -24,6 +24,9 @@
 (def ensure-attribute-type-def-xt-id
   (partial ensure-xt-id :openmetadata.AttributeTypeDef/guid))
 
+(def ensure-relationship-xt-id
+  (partial ensure-xt-id :openmetadata.Relationship/guid))
+
 (defn- entity-exist? [node guid]
   (let [db (xt/db node)
         q  `{:find  [?e]
@@ -58,6 +61,21 @@
          eids (map first rs)]
      (mapv #(xt/entity db %) eids))))
 
+(defn fetch-classification-by-entity-guid-and-name
+  ([node guid name]
+   (fetch-classification-by-entity-guid-and-name node guid name (Date.)))
+  ([node guid name valid-time]
+   (let [db  (xt/db node valid-time)
+         q   `{:find  [?c]
+               :in    [?guid ?name]
+               :where [[?e :openmetadata.Entity/guid ?guid]
+                       [?e :openmetadata.Entity/classifications ?c]
+                       [?c :openmetadata.Classification/name ?name]]}
+         rs  (xt/q db q guid name)
+         eid (ffirst rs)]
+     (when eid
+       (xt/entity db eid)))))
+
 (defn fetch-entity-by-guid
   ([node guid]
    (fetch-entity-by-guid node guid (Date.)))
@@ -69,9 +87,7 @@
          classifications (fetch-classifications-by-entity-guid node guid valid-time)
          rs              (xt/q db q guid)
          eid             (ffirst rs)]
-     (tap> guid)
      (when eid
-       (tap> eid)
        (-> (xt/entity db eid)
          (assoc :openmetadata.Entity/classifications classifications))))))
 
@@ -102,6 +118,10 @@
 (defn fetch-attribute-type-def-by-name [node name]
   (fetch-document-by-attribute-value node
     :openmetadata.AttributeTypeDef/name name))
+
+(defn fetch-relationship-by-guid [node guid]
+  (fetch-document-by-attribute-value node
+    :openmetadata.Relationship/guid guid))
 
 (defn- fetch-documents-by-attribute [node attribute]
   (let [db  (xt/db node)
@@ -134,6 +154,11 @@
 (defn- entity-valid-time [entity]
   (or (:openmetadata.Entity/updateTime entity)
     (:openmetadata.Entity/createTime entity)
+    (Date.)))
+
+(defn- relationship-valid-time [relationship]
+  (or (:openmetadata.Relationship/updateTime relationship)
+    (:openmetadata.Relationship/createTime relationship)
     (Date.)))
 
 
@@ -214,3 +239,11 @@
     (let [tx-ops (persistent! tx-ops)]
       (when (not-empty tx-ops)
         (xt/submit-tx node tx-ops)))))
+
+(defn persist-relationship [node relationship]
+  (let [guid           (:openmetadata.Relationship/guid relationship)
+        relationship-0 (fetch-relationship-by-guid node guid)
+        relationship-1 (ensure-relationship-xt-id relationship)]
+    (when (different? relationship-0 relationship-1)
+      (xt/submit-tx node [[::xt/put relationship-1 (relationship-valid-time relationship-1)]]))))
+

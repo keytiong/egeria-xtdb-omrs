@@ -2,7 +2,7 @@
   (:require [clojure.core.protocols :as p]
             [clojure.datafy :refer [datafy]]
             [io.kosong.egeria.omrs :as omrs])
-  (:import (org.odpi.openmetadata.repositoryservices.connectors.stores.metadatacollectionstore.properties.instances PrimitivePropertyValue ArrayPropertyValue MapPropertyValue EnumPropertyValue InstanceStatus InstanceProvenanceType Classification EntityDetail EntitySummary InstanceType InstanceProperties StructPropertyValue InstancePropertyCategory EntityProxy Relationship)
+  (:import (org.odpi.openmetadata.repositoryservices.connectors.stores.metadatacollectionstore.properties.instances PrimitivePropertyValue ArrayPropertyValue MapPropertyValue EnumPropertyValue InstanceStatus InstanceProvenanceType Classification EntityDetail EntitySummary InstanceType InstanceProperties StructPropertyValue InstancePropertyCategory EntityProxy Relationship ClassificationOrigin)
            (org.odpi.openmetadata.repositoryservices.connectors.stores.metadatacollectionstore.properties.typedefs TypeDef EntityDef RelationshipDef ClassificationDef PrimitiveDef CollectionDef EnumElementDef EnumDef AttributeTypeDef PrimitiveDefCategory CollectionDefCategory TypeDefAttribute ExternalStandardMapping AttributeTypeDefCategory AttributeCardinality TypeDefAttributeStatus TypeDefStatus TypeDefCategory TypeDefLink ClassificationPropagationRule RelationshipEndDef RelationshipEndCardinality)))
 
 ;;
@@ -149,7 +149,7 @@
        :statusOnDelete           (fn [^Classification o] (some-> o .getStatusOnDelete .name))
        :mappingProperties        (fn [^Classification o] (.getMappingProperties o))
        :name                     (fn [^Classification o] (.getName o))
-       :classificationOrigin     (fn [^Classification o] (.getClassificationOrigin o))
+       :classificationOrigin     (fn [^Classification o] (some-> o .getClassificationOrigin .name))
        :classificationOriginGUID (fn [^Classification o] (.getClassificationOriginGUID o))})
 
 (def ^:private entity-summary->map
@@ -399,7 +399,7 @@
                                      (doto o (.setStatusOnDelete x))))
        :mappingProperties        (fn [^Classification o v] (doto o (.setMappingProperties v)))
        :name                     (fn [^Classification o v] (doto o (.setName v)))
-       :classificationOrigin     (fn [^Classification o v] (doto o (.setClassificationOrigin v)))
+       :classificationOrigin     (fn [^Classification o v] (doto o (.setClassificationOrigin (ClassificationOrigin/valueOf v))))
        :classificationOriginGUID (fn [^Classification o v] (doto o (.setClassificationOriginGUID v)))})
 
 (def ^:private map->entity-summary
@@ -442,8 +442,6 @@
 (def ^:private map->entity-proxy
   (merge map->entity-summary
     {}))
-
-
 
 (def ^:private map->instance-type
   #:openmetadata.TypeDef
@@ -547,6 +545,14 @@
   [coll k v]
   (nav-type-def v))
 
+(defmethod navigate :openmetadata.Relationship/entityOne
+  [coll k v]
+  (nav-entity v))
+
+(defmethod navigate :openmetadata.Relationship/entityTwo
+  [coll k v]
+  (nav-entity v))
+
 (defmethod navigate :default [coll k v] v)
 
 ;;
@@ -638,7 +644,7 @@
   (datafy [^EnumPropertyValue o]
     (.getSymbolicName o)))
 
-(defn instance-properties->map [type-def ^InstanceProperties instance-props]
+(defn InstanceProperties->map [type-def ^InstanceProperties instance-props]
   (let [attribute-keys (omrs/attribute-keys type-def)
         props          (some-> instance-props .getInstanceProperties)]
     (reduce (fn [m attribute-key]
@@ -656,7 +662,7 @@
           type-def (omrs/find-type-def-by-guid guid)]
       (merge
         (datafy-egeria classification->map o)
-        (instance-properties->map type-def props)))))
+        (InstanceProperties->map type-def props)))))
 
 (extend-type EntityDetail
   p/Datafiable
@@ -666,7 +672,7 @@
           type-def (omrs/find-type-def-by-guid guid)]
       (merge
         (datafy-egeria entity-summary->map o)
-        (instance-properties->map type-def props)))))
+        (InstanceProperties->map type-def props)))))
 
 (extend-type EntityProxy
   p/Datafiable
@@ -676,7 +682,7 @@
           type-def (omrs/find-type-def-by-guid guid)]
       (merge
         (datafy-egeria entity-proxy->map o)
-        (instance-properties->map type-def props)))))
+        (InstanceProperties->map type-def props)))))
 
 (extend-type EntitySummary
   p/Datafiable
@@ -694,7 +700,7 @@
           type-def (omrs/find-type-def-by-guid guid)]
       (merge
         (datafy-egeria relationship->map o)
-        (instance-properties->map type-def props)))))
+        (InstanceProperties->map type-def props)))))
 ;;
 ;; Data->Egeria
 ;;
@@ -702,6 +708,7 @@
 (defn- map->egeria [kfs o m]
   (reduce-kv (fn [o k f]
                (let [v (navigate m k (k m))]
+                 (tap> k)
                  (f o v)))
     o
     kfs))
@@ -905,6 +912,8 @@
     (map->egeria map->instance-type (InstanceType.) m)))
 
 (defn map->Relationship [m]
+  (tap> "before")
+  (map->egeria map->relationship (Relationship.) m)
   (let [^Relationship o (map->egeria map->relationship (Relationship.) m)
         type-def        (omrs/find-type-def-by-guid (:openmetadata.Relationship/type m))
         instance-props  (map->InstanceProperties type-def m)]

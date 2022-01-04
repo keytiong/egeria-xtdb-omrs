@@ -5,16 +5,18 @@
             [integrant.core :as ig]
             [dev]
             [xtdb.api :as xt]
-            [clojure.datafy :refer [datafy]])
+            [clojure.datafy :refer [datafy]]
+            [io.kosong.egeria.omrs.xtdb.metadata-store :as store])
   (:import (java.util UUID Date)
-           (org.odpi.openmetadata.repositoryservices.connectors.stores.metadatacollectionstore.properties.instances InstanceStatus EntityDetail PrimitivePropertyValue)))
+           (org.odpi.openmetadata.repositoryservices.connectors.stores.metadatacollectionstore.properties.instances InstanceStatus EntityDetail PrimitivePropertyValue Classification)))
 
 (def system
   (ig/init dev/dev-config))
 
 (om/set-context! (dev/context system))
 
-(def test-user "garygeeke")
+(def user-alice "alice")
+(def user-bob "bob")
 
 (def metadata-collection-id
   (-> system :dev/repository-config :metadata-collection-id))
@@ -22,139 +24,237 @@
 (def metadata-collection-name
   (-> system :dev/repository-config :metadata-collection-name))
 
-(def server-name
-  (-> system :dev/repository-config :server-name))
 
 ;; Easy reference to the metadata collection test subject
 (def metadata-collection
   (dev/metadata-collection system))
 
-;; We will test metadata collection entity lifecycle operations with CSVFile metadata
-(def csvfile-type-def (om/find-type-def-by-name "CSVFile"))
 
-;; Prepares initial values of entity metadata
-(def cvsfile-v1-properties-map
-  {:openmetadata.Referenceable/qualifiedName "/omrs/test-file.csv"
-   :openmetadata.DataFile/fileType "csv"
-   :openmetadata.CSVFile/delimiterCharacter ","
-   :openmetadata.CSVFile/quoteCharacter "\""})
+;; We will test metadata collection entity lifecycle operations with Glossary
 
-;; Converts CSVFile properties map into InstanceProperties for addEntity()
-(def csvfile-v1-instance-properties
-  (om-datafy/map->InstanceProperties csvfile-type-def cvsfile-v1-properties-map))
+;; EntityDef
+(def glossary-type (om/find-type-def-by-name "Glossary"))
+(def glossary-term-type (om/find-type-def-by-name "ControlledGlossaryTerm"))
 
-;; Invoke addEntity() and save the returned EntityDetails
-(def add-entity-result
+;; Glossary -> Glossary Term RelationshipDef
+(def term-anchor-type (om/find-type-def-by-name "TermAnchor"))
+
+;; ClassificationDef
+(def anchors-type-def (om/find-type-def-by-name "Anchors"))
+(def confidence-type-def (om/find-type-def-by-name "Confidence"))
+
+(def glossary-type-guid (:openmetadata.TypeDef/guid glossary-type))
+(def glossary-term-type-guid (:openmetadata.TypeDef/guid glossary-term-type))
+(def term-anchor-type-guid (:openmetadata.TypeDef/guid term-anchor-type))
+
+(defn- InstanceProperties-for [type-def m]
+  (om-datafy/map->InstanceProperties type-def m))
+
+;; Invoke addEntity to create a new entity
+(def glossary-001-v1
   (.addEntity metadata-collection
-    test-user
-    (:openmetadata.TypeDef/guid csvfile-type-def)
-    csvfile-v1-instance-properties
-    []
+    user-alice
+    glossary-type-guid
+    (InstanceProperties-for glossary-type
+      {:openmetadata.Referenceable/qualifiedName "OMRS:Glossary-001"
+       :openmetadata.Glossary/displayName "Glossary 001"
+       :openmetadata.Glossary/description "Glossary 001 description"})
+    [] ;; Classification list
     InstanceStatus/ACTIVE))
 
-(fact "addEntity() returns EntityDetail"
-  (type add-entity-result) => EntityDetail)
+(def glossary-001-guid (.getGUID glossary-001-v1))
 
-(fact "add entity result version equals 1"
-  (.getVersion add-entity-result) => 1)
+(facts "addEntity()"
+  (fact
+    (type glossary-001-v1) => EntityDetail)
 
-(fact "add entity result created by"
-  (.getCreatedBy add-entity-result) => test-user)
+  (fact
+    (.getVersion glossary-001-v1) => 1)
 
-(fact "add entity result create time"
-  (type (.getCreateTime add-entity-result)) => Date)
+  (fact
+    (.getCreatedBy glossary-001-v1) => user-alice)
 
-;; Save the GUID of newly added Entity for later tests
-(def csvfile-guid (.getGUID add-entity-result))
+  (fact
+    (type (.getCreateTime glossary-001-v1)) => Date)
 
-(fact "add entity result has a GUID"
-  csvfile-guid = =test=> (fn [x] (UUID/fromString x)))
+  (fact
+    (.getMetadataCollectionId glossary-001-v1) => metadata-collection-id)
 
-;; Invoke isEntityKnown() with the newly created entity GUID
-(def is-entity-known-result
+  (fact
+    (.getMetadataCollectionName glossary-001-v1) => metadata-collection-name)
+
+  (fact
+    glossary-001-guid =test=> (fn [x] (UUID/fromString x))))
+
+(fact "isEntityKnown()"
   (.isEntityKnown metadata-collection
-    test-user
-    csvfile-guid))
+    user-alice
+    glossary-001-guid) => glossary-001-v1)
 
-(fact "isEntityKnwon() returns EntityDetail"
-  (type is-entity-known-result) => EntityDetail)
+(def glossary-term-001-v1
+  (.addEntity metadata-collection
+    user-alice
+    glossary-term-type-guid
+    (InstanceProperties-for glossary-type
+      {:openmetadata.Referenceable/qualifiedName "GlossaryTerm-001"
+       :openmetadata.GlossaryTerm/displayName "Glossary Term 001"
+       :openmetadata.GlossaryTerm/description "Glossary Term 001 description"})
+    [] ;; Classification list
+    InstanceStatus/DRAFT))
 
-;; Invoke getEntityDetail() with the same GUID
-(def get-entity-result
-  (.getEntityDetail metadata-collection
-    test-user
-    csvfile-guid))
+(def glossary-term-001-guid (.getGUID glossary-term-001-v1))
 
-(fact "getEntityDetail() returns EntityDetail"
-  (type get-entity-result) => EntityDetail)
-
-(fact "addEntity() getEntityDetail() and isEntityKnown() results should equals"
-  (= add-entity-result is-entity-known-result get-entity-result) => truthy)
-
-;; Save get entity result as version 1
-(def csvfile-entity-v1 get-entity-result)
-
-;; Prepare instance properties to add description to csvfile metadata
-(def cvsfile-v2-properties-map
-  {:openmetadata.Referenceable/qualifiedName "/omrs/test-file.csv"
-   :openmetadata.DataFile/fileType "csv"
-   :openmetadata.CSVFile/delimiterCharacter ","
-   :openmetadata.CSVFile/quoteCharacter "\""
-   :openmetadata.Asset/description "csvfile description v2"})
-
-(def csvfile-v2-instance-properties
-  (om-datafy/map->InstanceProperties csvfile-type-def cvsfile-v2-properties-map))
-
-;; Invoke updateEntityProperties()
-
-(def update-entity-properties-result
+(def glossary-term-001-v2
   (.updateEntityProperties metadata-collection
-    test-user
-    csvfile-guid
-    csvfile-v2-instance-properties))
+    user-bob
+    glossary-term-001-guid
+    (InstanceProperties-for glossary-term-type
+      {:openmetadata.Referenceable/qualifiedName "GlossaryTerm-001"
+       :openmetadata.GlossaryTerm/displayName "Glossary Term 001"
+       :openmetadata.GlossaryTerm/description "Glossary Term 001 description v2"})))
 
-(fact "updateEntityProperties() returns EntityDetail"
-  (type update-entity-properties-result) => EntityDetail)
+(facts "updateEntityProperties()"
 
-(fact "entity version is now 2"
-  (.getVersion update-entity-properties-result) => 2)
+  (fact
+    (.getVersion glossary-term-001-v2) => 2)
 
-(fact "entity description is updated"
-  (some-> update-entity-properties-result
-    .getProperties
-    .getInstanceProperties
-    (.get "description")
-    .valueAsString)
-  => "csvfile description v2")
+  (fact
+    (.getUpdatedBy glossary-term-001-v2) => user-bob)
 
-(->> (om/list-type-defs)
-  #_(filter #(< 2 (count (:openmetadata.TypeDef/validInstanceStatusList %))))
-  (map #(select-keys % [#_:openmetadata.TypeDef/validInstanceStatusList
-                        :openmetadata.TypeDef/name
-                        :openmetadata.TypeDef/description])))
+  (fact
+    (.getUpdateTime glossary-term-001-v2) =not=> nil)
 
+  (fact
+    (some-> glossary-term-001-v2
+      .getProperties
+      .getInstanceProperties
+      (.get "description")
+      .valueAsString)
+    => "Glossary Term 001 description v2"))
 
 
+(def glossary-term-001-v3
+  (.updateEntityStatus metadata-collection
+    user-alice
+    glossary-term-001-guid
+    InstanceStatus/PROPOSED))
 
-#_(def anchor-classification
-  (-> (om/skeleton-classification
-        {:user-name                test-user
-         :type-name                "Anchors"
-         :metadata-collection-id   metadata-collection-id
-         :metadata-collection-name metadata-collection-name
-         :instance-provenance-type "LOCAL_COHORT"
-         })
-    (assoc :openmetadata.Anchors/anchorGUID (str (UUID/randomUUID)))))
+(facts "updateEntityStatus()"
+  (fact
+    (.getStatus glossary-term-001-v3) => InstanceStatus/PROPOSED)
 
-#_(def confidence-classification
-  (-> (om/skeleton-classification
-        {:user-naem                test-user
-         :type-name                "Confidence"
-         :metadata-collection-id   metadata-collection-id
-         :metadata-collection-name metadata-collection-name
-         :instance-provenance-type "LOCAL_COHORT"})
-    (assoc :openmetadata.Confidence/confidence 39)))
+  (fact
+    (.getVersion glossary-term-001-v3) => 3))
 
+
+(def glossary-term-001-v4
+  (.classifyEntity metadata-collection
+    user-alice
+    glossary-term-001-guid
+    "Anchors"
+    (InstanceProperties-for anchors-type-def
+      {:openmetadata.Anchors/anchorGUID glossary-001-guid})))
+
+(xt/sync (dev/xtdb-node system))
+
+(def glossary-term-001-v5
+  (.classifyEntity metadata-collection
+    user-alice
+    glossary-term-001-guid
+    "Confidence"
+    (InstanceProperties-for confidence-type-def
+      {:openmetadata.Confidence/confidence 51})))
+
+(facts "classifyEntity()"
+  (fact
+    (.getVersion glossary-term-001-v4) => 4)
+
+  (fact
+    (-> (datafy glossary-term-001-v4)
+      :openmetadata.Entity/classifications
+      count)
+    => 1)
+
+  (fact
+    (.getVersion glossary-term-001-v5) => 5)
+
+  (fact
+    (-> (datafy glossary-term-001-v5)
+      :openmetadata.Entity/classifications
+      count)
+    => 2))
+
+(def glossary-term-001-v6
+  (.updateEntityClassification metadata-collection
+    user-alice
+    glossary-term-001-guid
+    "Confidence"
+    (InstanceProperties-for confidence-type-def
+      {:openmetadata.Confidence/confidence 95})))
+
+(facts "updateEntityClassification()"
+  (fact
+    (.getVersion glossary-term-001-v6) => 6)
+
+  (fact
+    (->> (datafy glossary-term-001-v6)
+      :openmetadata.Entity/classifications
+      (filter #(= "Confidence" (:openmetadata.Classification/name %)))
+      (first)
+      :openmetadata.Classification/version) => 2)
+
+  (fact
+    (->> (datafy glossary-term-001-v6)
+      :openmetadata.Entity/classifications
+      (filter #(= "Confidence" (:openmetadata.Classification/name %)))
+      (first)
+      :openmetadata.Confidence/confidence) => 95))
+
+(def glossary-term-001-v7
+  (.declassifyEntity metadata-collection
+    user-alice
+    glossary-term-001-guid
+    "Anchors"))
+
+(facts "declassifyEntity()"
+
+  (fact
+    (.getVersion glossary-term-001-v7) => 7)
+
+  (fact
+    (->> (datafy glossary-term-001-v7)
+      :openmetadata.Entity/classifications
+      (filter #(= "Anchors" (:openmetadata.Classification/name %)))
+      empty?) => truthy))
+
+(def relationship-001
+  (.addRelationship metadata-collection
+    user-alice
+    term-anchor-type-guid
+    nil
+    glossary-001-guid
+    glossary-term-001-guid
+    InstanceStatus/ACTIVE))
+
+(def relationship-001-guid (.getGUID relationship-001))
+
+(facts "addRelationship()"
+  (fact
+    (-> relationship-001 .getEntityOneProxy .getGUID) => glossary-001-guid)
+  (fact
+    (-> relationship-001 .getEntityTwoProxy .getGUID) => glossary-term-001-guid)
+
+  (fact
+    (-> relationship-001 .getEntityOneProxy .getType .getTypeDefGUID) => glossary-type-guid)
+
+  (fact
+    (-> relationship-001 .getEntityTwoProxy .getType .getTypeDefGUID) => glossary-term-type-guid))
+
+
+
+;;
+;; clean up
+;;
 
 (om/set-context! nil)
 

@@ -99,31 +99,34 @@
         type-def-guid  (:openmetadata.TypeDef/guid type-def)
         initial-status (:openmetadata.TypeDef/initialStatus type-def)]
     (when type-def
-      {:openmetadata.Entity/headerVersion          1
-       :openmetadata.Entity/instanceProvenanceType instance-provenance-type
-       :openmetadata.Entity/metadataCollectionId   metadata-collection-id
-       :openmetadata.Entity/metadataCollectionName metadata-collection-name
-       :openmetadata.Entity/guid                   guid
-       :openmetadata.Entity/createTime             (Date.)
-       :openmetadata.Entity/version                1
-       :openmetadata.Entity/type                   type-def-guid
-       :openmetadata.Entity/status                 initial-status
-       :openmetadata.Entity/createdBy              user-name})))
+      #:openmetadata.Entity
+          {:headerVersion          1
+           :instanceProvenanceType instance-provenance-type
+           :metadataCollectionId   metadata-collection-id
+           :metadataCollectionName metadata-collection-name
+           :guid                   guid
+           :createTime             (Date.)
+           :version                1
+           :type                   type-def-guid
+           :status                 initial-status
+           :createdBy              user-name})))
 
 (defn skeleton-classification
   [{:keys [metadata-collection-id metadata-collection-name instance-provenance-type
-           user-name type-name]}]
+           replicated-by user-name type-name]}]
   (let [type-def       (find-type-def-by-name type-name)
         type-def-guid  (:openmetadata.TypeDef/guid type-def)
         initial-status (:openmetadata.TypeDef/initialStatus type-def)]
     (when type-def
-      {:openmetadata.Classification/headerVersion          1
-       :openmetadata.Classification/instanceProvenanceType instance-provenance-type
-       :openmetadata.Classification/metadataCollectionId   metadata-collection-id
-       :openmetadata.Classification/metadataCollectionName metadata-collection-name
-       :openmetadata.Classification/createTime             (Date.)
-       :openmetadata.Classification/version                1
-       :openmetadata.Classification/name                   (:openmetadata.TypeDef/name type-def)
-       :openmetadata.Classification/type                   type-def-guid
-       :openmetadata.Classification/status                 initial-status
-       :openmetadata.Classification/createdBy              user-name})))
+      #:openmetadata.Classification
+          {:headerVersion          1
+           :instanceProvenanceType instance-provenance-type
+           :metadataCollectionId   metadata-collection-id
+           :metadataCollectionName metadata-collection-name
+           :createTime             (Date.)
+           :version                1
+           :name                   (:openmetadata.TypeDef/name type-def)
+           :type                   type-def-guid
+           :status                 initial-status
+           :createdBy              user-name
+           :replicatedBy           replicated-by})))

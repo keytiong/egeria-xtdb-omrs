@@ -266,6 +266,10 @@
 (defmethod ig/halt-key! ::cts-server [_ {:keys [platform server-name]}]
   (stop-server platform server-name))
 
+;; https://localhost:9443/open-metadata/admin-services/users/garygeeke/servers/SUT_Server/configuration
+
+;; https://localhost:9443/open-metadata/admin-services/users/garygeeke/servers/SUT_Server/configuration
+
 ;; https://localhost:9443/servers/CTS_Server/open-metadata/conformance-suite/users/garygeeke/report/summary
 
 ;; https://localhost:9443/servers/CTS_Server/open-metadata/conformance-suite/users/garygeeke/report/test-cases/failed

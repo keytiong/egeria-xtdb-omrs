@@ -28,6 +28,10 @@
     (.setAccessible m true)
     (.get m local-connector)))
 
+(defmethod ig/init-key ::server-config
+  [_ config]
+  config)
+
 (defmethod ig/init-key ::repository-config
   [_ config]
   config)
@@ -60,11 +64,11 @@
         (:GUID logRecord)))))
 
 (defmethod ig/init-key ::audit-log-destination
-  [_ {:keys [repository-config audit-log-stores]}]
+  [_ {:keys [server-config repository-config audit-log-stores]}]
   (let [{:keys [organization
                 server-name
-                server-type
-                metadata-collection-id]} repository-config]
+                server-type]} server-config
+        {:keys [metadata-collection-id]} repository-config]
     (doto (OMRSAuditLogDestination. server-name server-type organization audit-log-stores)
       (.setLocalMetadataCollectionId metadata-collection-id))))
 
@@ -77,8 +81,8 @@
     component-wiki-url))
 
 (defmethod ig/init-key ::repository-content-manager
-  [_ {:keys [repository-config audit-log]}]
-  (let [server-user-id (:server-user-id repository-config)]
+  [_ {:keys [server-config audit-log]}]
+  (let [server-user-id (:server-user-id server-config)]
     (OMRSRepositoryContentManager. server-user-id audit-log)))
 
 (defmethod ig/init-key ::repository-content-helper
@@ -132,14 +136,14 @@
       (.start))))
 
 (defmethod ig/init-key ::local-repository-connector
-  [_ {:keys [repository-config connection repository-event-manager repository-content-manager
+  [_ {:keys [server-config repository-config connection repository-event-manager repository-content-manager
              repository-content-helper repository-content-validator audit-log]}]
-  (let [{:keys [metadata-collection-id
-                metadata-collection-name
-                repository-name
-                server-name
+  (let [{:keys [server-name
                 server-type
-                server-user-id]} repository-config
+                server-user-id]} server-config
+        {:keys [metadata-collection-id
+                metadata-collection-name
+                repository-name]} repository-config
         provider  (LocalOMRSConnectorProvider.
                     metadata-collection-id
                     connection
@@ -193,17 +197,20 @@
 
 (def dev-config
   {
-   ::repository-config            {:server-name              "b2718e10-9aa0-4944-8849-e856959cbbaa"
-                                   :server-user-id           "xtdb"
-                                   :server-type              "OMRS Repository"
-                                   :organization             "Egeria"
-                                   :metadata-collection-id   "b2718e10-9aa0-4944-8849-e856959cbbaa"
-                                   :metadata-collection-name "Dev Metadata Collection"}
+   ::server-config                {:server-name    "Developer local server"
+                                   :server-user-id "system"
+                                   :server-type    "Open Metadata and Governance Server"
+                                   :organization   "Egeria"}
+
+   ::repository-config            {:metadata-collection-id   "b2718e10-9aa0-4944-8849-e856959cbbaa"
+                                   :metadata-collection-name "Dev Metadata Collection"
+                                   :repository-name          "Dev Metadata Repository"}
 
    ::audit-log-store              {}
 
-   ::audit-log-destination        {:server-config    (ig/ref ::repository-config)
-                                   :audit-log-stores [(ig/ref ::audit-log-store)]}
+   ::audit-log-destination        {:server-config     (ig/ref ::server-config)
+                                   :repository-config (ig/ref ::repository-config)
+                                   :audit-log-stores  [(ig/ref ::audit-log-store)]}
 
    ::audit-log                    {:destination           (ig/ref ::audit-log-destination)
                                    :component-id          1
@@ -211,8 +218,8 @@
                                    :component-description "XTDB OMRS Repository"
                                    :component-wiki-url    "http://github.com/keytiong"}
 
-   ::repository-content-manager   {:repository-config (ig/ref ::repository-config)
-                                   :audit-log         (ig/ref ::audit-log)}
+   ::repository-content-manager   {:server-config (ig/ref ::server-config)
+                                   :audit-log     (ig/ref ::audit-log)}
 
    ::repository-content-helper    {:repository-content-manager (ig/ref ::repository-content-manager)}
 
@@ -234,7 +241,8 @@
 
    ::xtdb-node                    {:connector (ig/ref ::local-repository-connector)}
 
-   ::local-repository-connector   {:repository-config            (ig/ref ::repository-config)
+   ::local-repository-connector   {:server-config                (ig/ref ::server-config)
+                                   :repository-config            (ig/ref ::repository-config)
                                    :connection                   (ig/ref ::xtdb-repository-connection)
                                    :repository-event-manager     (ig/ref ::repository-event-manager)
                                    :repository-content-manager   (ig/ref ::repository-content-manager)

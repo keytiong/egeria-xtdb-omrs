@@ -1,15 +1,18 @@
 (ns io.kosong.egeria.omrs.xtdb.xtdb-metadata-collection
   (:require [clojure.datafy :refer [datafy]]
             [io.kosong.egeria.omrs :as om]
+            [io.kosong.egeria.omrs.protocols :as om-p]
             [io.kosong.egeria.omrs.xtdb.metadata-store :as store]
             [io.kosong.egeria.omrs.datafy :as om-datafy]
             [xtdb.api :as xt])
   (:import (org.odpi.openmetadata.repositoryservices.connectors.stores.metadatacollectionstore.properties.typedefs TypeDef AttributeTypeDef TypeDefSummary)
-           (org.odpi.openmetadata.repositoryservices.connectors.stores.metadatacollectionstore.properties.instances EntityDetail InstanceProperties EntitySummary InstanceStatus EntityProxy ClassificationOrigin Classification Relationship InstanceProvenanceType)
+           (org.odpi.openmetadata.repositoryservices.connectors.stores.metadatacollectionstore.properties.instances EntityDetail InstanceProperties EntitySummary InstanceStatus EntityProxy ClassificationOrigin Classification Relationship InstanceProvenanceType InstanceAuditHeader)
            (java.util Date Collections List)
            (org.odpi.openmetadata.repositoryservices.connectors.stores.metadatacollectionstore.properties HistorySequencingOrder SequencingOrder MatchCriteria)
            (org.odpi.openmetadata.repositoryservices.connectors.stores.metadatacollectionstore.properties.search SearchProperties SearchClassifications)
-           (org.odpi.openmetadata.frameworks.auditlog AuditLog)))
+           (org.odpi.openmetadata.frameworks.auditlog AuditLog)
+           (org.odpi.openmetadata.repositoryservices.ffdc.exception EntityNotKnownException)
+           (org.odpi.openmetadata.repositoryservices.ffdc OMRSErrorCode)))
 
 (gen-class
   :name io.kosong.egeria.omrs.xtdb.XtdbOMRSMetadataCollection
@@ -17,18 +20,23 @@
   :init init
   :post-init post-init
   :state state
-  :exposes-methods {setAuditLog                             superSetAuditLog
-                    addTypeDef                              superAddTypeDef
-                    updateTypeDef                           superUpdateTypeDef
-                    addAttributeTypeDef                     superAddAttributeTypeDef
-                    deleteTypeDef                           superDeleteTypeDef
-                    deleteAttribtueTypeDef                  superDeleteAttributeTypeDef
-                    reIdentifyTypeDef                       superDeIdentifyTypeDef
-                    reIdentifyAttribtueTypeDef              superDeIdentifyAttribtueTypeDef
-                    reportTypeDefAlreadyDefined             superReportTypeDefAlreadyDefined
-                    addEntityParameterValidation            superAddEntityParameterValidation
-                    getInstanceParameterValidation          superGetInstanceParameterValidation
-                    updateInstanceStatusParameterValidation superUpdateInstanceStatusParameterValidation
+  :exposes-methods {setAuditLog                                superSetAuditLog
+                    addAttributeTypeDef                        superAddAttributeTypeDef
+                    addEntityParameterValidation               superAddEntityParameterValidation
+                    addEntityProxyParameterValidation          superAddEntityProxyParameterValidation
+                    addRelationshipParameterValidation         superAddRelationshipParameterValidation
+                    addTypeDef                                 superAddTypeDef
+                    classifyEntityParameterValidation          superClassifyEntityParameterValidation
+                    declassifyEntityParameterValidation        superDeclassifyEntityParameterValidation
+                    deleteTypeDef                              superDeleteTypeDef
+                    updateTypeDef                              superUpdateTypeDef
+                    updateInstanceStatusParameterValidation    superUpdateInstanceStatusParameterValidation
+                    deleteAttribtueTypeDef                     superDeleteAttributeTypeDef
+                    reIdentifyTypeDef                          superDeIdentifyTypeDef
+                    reIdentifyAttribtueTypeDef                 superDeIdentifyAttribtueTypeDef
+                    reportTypeDefAlreadyDefined                superReportTypeDefAlreadyDefined
+                    getInstanceParameterValidation             superGetInstanceParameterValidation
+                    updateInstancePropertiesPropertyValidation superUpdateInstancePropertiesPropertyValidation
                     }
   :constructors {[io.kosong.egeria.omrs.xtdb.XtdbOMRSRepositoryConnector ;; parentConnector
                   String                                    ;; repositoryName
@@ -52,7 +60,6 @@
    ^String metadataCollectionId
    ^org.odpi.openmetadata.frameworks.auditlog.AuditLog auditLog]
   (let [xtdb-node                (some-> (.getXtdbNode connector) :node)
-        context                  (om/->context {:type-store repositoryHelper})
         server-name              (.getServerName connector)
         metadata-collection-name (.getMetadataCollectionName connector)
         state                    (atom {:server-name               server-name
@@ -60,8 +67,7 @@
                                         :metadata-collection-id    metadataCollectionId
                                         :metadata-collection-name  metadata-collection-name
                                         :repository-content-helper repositoryHelper
-                                        :xtdb-node                 xtdb-node
-                                        :context                   context})]
+                                        :xtdb-node                 xtdb-node})]
     [[connector repositoryName repositoryHelper repositoryValidator metadataCollectionId] state]))
 
 (defn -post-init
@@ -72,7 +78,10 @@
    ^org.odpi.openmetadata.repositoryservices.connectors.stores.metadatacollectionstore.repositoryconnector.OMRSRepositoryValidator repositoryValidator
    ^String metadataCollectionId
    ^AuditLog auditLog]
-  (.superSetAuditLog this auditLog))
+  (.superSetAuditLog this auditLog)
+  (let [context (om/->context {:type-store repositoryHelper
+                               :instance-store this})]
+    (swap! (.state this) assoc :context context)))
 
 (defn -addTypeDef
   [this userId newTypeDef]
@@ -96,7 +105,8 @@
                 context]} @(.state this)
         updated (.superUpdateTypeDef this userId typeDefPatch)]
     (binding [om/*context* context]
-      (store/persist-type-def xtdb-node (datafy updated)))))
+      (store/persist-type-def xtdb-node (datafy updated))
+      updated)))
 
 (defn -deleteTypeDef
   [this userId obsoleteTypeDefGUID obsoleteTypeDefName]
@@ -115,38 +125,46 @@
   (.superReIdentifyAttribtueTypeDef this userId originalAttributeTypeDefGUID originalAttributeTypeDefName
     newAttributeTypeDefGUID newAttributeTypeDefName))
 
+(defn- is-entity-known-else-throw
+  ([this guid]
+   (is-entity-known-else-throw this guid (Date.)))
+  ([this guid valid-time]
+  (let [{:keys [repository-name
+                xtdb-node]} @(.state this)
+        entity (store/fetch-entity-by-guid xtdb-node guid valid-time)]
+    (if entity
+      entity
+      (let [msg-params (into-array String [guid "is-entity-known" repository-name])
+            msg        (.getMessageDefinition OMRSErrorCode/ENTITY_NOT_KNOWN msg-params)]
+        (throw (EntityNotKnownException. msg
+                 (str 'io.kosong.egeria.omrs.xtdb.xtdb-metadata-collection)
+                 "")))))))
+
 (defn ^EntityDetail -isEntityKnown
   [this userId guid]
   (.superGetInstanceParameterValidation this userId guid "isEntityKnown")
-  (let [{:keys [xtdb-node
-                context]} @(.state this)
-        entity (store/fetch-entity-by-guid xtdb-node guid)]
-    (when entity
-      (binding [om/*context* context]
-        (om-datafy/map->EntityDetail entity)))))
+  (let [{:keys [context]} @(.state this)
+        entity (is-entity-known-else-throw this guid)]
+    (binding [om/*context* context]
+      (om-datafy/map->EntityDetail entity))))
 
 (defn ^EntitySummary -getEntitySummary
   [this userId guid]
   (.superGetInstanceParameterValidation this userId guid "getEntitySummary")
-  (let [{:keys [xtdb-node
-                context]} @(.state this)
-        entity (store/fetch-entity-by-guid xtdb-node guid)]
-    (when entity
-      (binding [om/*context* context]
-        (om-datafy/map->EntitySummary entity)))))
+  (let [{:keys [context]} @(.state this)
+        entity (is-entity-known-else-throw this guid)]
+    (binding [om/*context* context]
+      (om-datafy/map->EntitySummary entity))))
 
 (defn ^EntityDetail -getEntityDetail
   ([this userId guid]
    (-getEntityDetail this userId guid (Date.)))
   ([this userId guid valid-time]
    (.superGetInstanceParameterValidation this userId guid "getEntityDetail")
-   (tap> guid)
-   (let [{:keys [xtdb-node context]} @(.state this)]
+   (let [{:keys [context]} @(.state this)
+         entity (is-entity-known-else-throw this guid valid-time)]
      (binding [om/*context* context]
-       (if-let [entity (store/fetch-entity-by-guid xtdb-node guid valid-time)]
-         (do
-           (tap> entity)
-           (om-datafy/map->EntityDetail entity)))))))
+       (om-datafy/map->EntityDetail entity)))))
 
 (defn -getEntityDetailHistory [this
                                ^String userId
@@ -343,6 +361,32 @@
       (xt/sync xtdb-node)
       entity)))
 
+(defn add-relationship [this user-id type-def entity-one entity-two instance-properties status]
+  (let [{:keys [metadata-collection-id
+                metadata-collection-name
+                context
+                xtdb-node]} @(.state this)
+        type-def-guid (:openmetadata.TypeDef/guid type-def)
+        relationship  (merge
+                        {:openmetadata.Relationship/type                   type-def-guid
+                         :openmetadata.Relationship/headerVersion          InstanceAuditHeader/CURRENT_AUDIT_HEADER_VERSION
+                         :openmetadata.Relationship/version                1
+                         :openmetadata.Relationship/metadataCollectionId   metadata-collection-id
+                         :openmetadata.Relationship/metadataCollectionName metadata-collection-name
+                         :openmetadata.Relationship/createdBy              user-id
+                         :openmetadata.Relationship/createTime             (Date.)
+                         :openmetadata.Relationship/instanceProvenanceType (.name InstanceProvenanceType/LOCAL_COHORT)
+                         :openmetadata.Relationship/status                 status
+                         :openmetadata.Relationship/guid                   (random-uuid-str)
+                         :openmetadata.Relationship/entityOne              entity-one
+                         :openmetadata.Relationship/entityTwo              entity-two}
+                        instance-properties)]
+    (binding [om/*context* context]
+      (store/persist-relationship xtdb-node relationship)
+      (xt/sync xtdb-node)
+      relationship)))
+
+
 (defn ^EntityDetail -addEntity
   [this userId entityTypeGUID properties classifications initialStatus]
   (.superAddEntityParameterValidation this userId, entityTypeGUID, properties, classifications, initialStatus,
@@ -350,24 +394,29 @@
   (let [{:keys [context]} @(.state this)]
     (binding [om/*context* context]
       (let [type-def            (om/find-type-def-by-guid entityTypeGUID)
-            instance-properties (om-datafy/instance-properties->map type-def properties)
+            instance-properties (om-datafy/InstanceProperties->map type-def properties)
             classifications     (mapv datafy classifications)
             status              (.name initialStatus)
             entity              (add-entity this userId type-def instance-properties classifications status)]
         (om-datafy/map->EntityDetail entity)))))
 
-(defn -addEntityProxy [this
-                       ^String userId
-                       ^EntityProxy entityProxy]
-  nil)
+(defn -addEntityProxy
+  [this
+   ^String userId
+   ^EntityProxy entityProxy]
+  (.superAddEntityProxyParameterValidation this userId entityProxy)
+  (let [{:keys [context xtdb-node]} @(.state this)]
+    (binding [om/*context* context]
+      (let [entity-proxy (datafy entityProxy)]
+        (store/persist-entity xtdb-node entity-proxy)))))
 
-(defn -updateEntityStatus
+(defn ^EntityDetail -updateEntityStatus
   [this userId entityGUID newStatus]
   (.superUpdateInstanceStatusParameterValidation this userId entityGUID newStatus "updateEntityStatus")
   (let [{:keys [xtdb-node
                 context]} @(.state this)]
     (binding [om/*context* context]
-      (let [entity (some-> (store/fetch-entity-by-guid xtdb-node entityGUID)
+      (let [entity (some-> (is-entity-known-else-throw this entityGUID)
                      (assoc :openmetadata.Entity/status (.name newStatus))
                      (assoc :openmetadata.Entity/updateTime (Date.))
                      (assoc :openmetadata.Entity/updatedBy userId)
@@ -377,24 +426,25 @@
           (xt/sync xtdb-node)
           (om-datafy/map->EntityDetail entity))))))
 
-(defn -updateEntityProperties
+(defn ^EntityDetail -updateEntityProperties
   [this userId entityGUID properties]
+  (.superUpdateInstancePropertiesPropertyValidation this userId entityGUID properties "updateEntityProperties")
   (let [{:keys [xtdb-node
                 context]} @(.state this)]
     (binding [om/*context* context]
-      (let [entity        (store/fetch-entity-by-guid xtdb-node entityGUID)
+      (let [entity        (is-entity-known-else-throw this entityGUID)
             type-def-guid (:openmetadata.Entity/type entity)
             type-def      (some-> type-def-guid om/find-type-def-by-guid)
             prop-map      (when type-def
-                            (om-datafy/instance-properties->map type-def properties))
+                            (om-datafy/InstanceProperties->map type-def properties))
             entity        (some-> entity
                             (merge prop-map)
                             (assoc :openmetadata.Entity/updateTime (Date.))
                             (assoc :openmetadata.Entity/updatedBy userId)
                             (update-in [:openmetadata.Entity/version] inc))]
-        (tap> prop-map)
         (when entity
-          (store/persist-entity xtdb-node (datafy entity))
+          (store/persist-entity xtdb-node entity)
+          (xt/sync xtdb-node)
           (om-datafy/map->EntityDetail entity))))))
 
 (defn -undoEntityUpdate [this
@@ -421,45 +471,137 @@
                       ^String deletedEntityGUID]
   nil)
 
-(defn -classifyEntity [this
-                       ^String userId
-                       ^String entityGUID
-                       ^String classificationName
-                       ^InstanceProperties classificationProperties]
-  nil)
+(defn ^EntityDetail -classifyEntity
+  ([this
+    userId
+    entityGUID
+    classificationName
+    classificationProperties]
+   (.classifyEntity this userId entityGUID classificationName nil nil ClassificationOrigin/ASSIGNED nil
+     classificationProperties))
+  ([this
+    ^String userId
+    ^String entityGUID
+    ^String classificationName
+    ^String externalSourceGUID
+    ^String externalSourceName
+    ^ClassificationOrigin classificationOrigin
+    ^String classificationOriginGUID
+    ^InstanceProperties classificationProperties]
+   (.superClassifyEntityParameterValidation this userId entityGUID classificationName classificationProperties "classifyEntity")
+   (let [{:keys [context
+                 xtdb-node
+                 metadata-collection-id
+                 metadata-collection-name]} @(.state this)]
+     (binding [om/*context* context]
+       (let [entity-0        (is-entity-known-else-throw this entityGUID)
+             type-def        (om/find-type-def-by-name classificationName)
+             replicated-by   (when externalSourceGUID
+                               metadata-collection-id)
+             collection-id   (if externalSourceGUID
+                               externalSourceGUID
+                               metadata-collection-id)
+             collection-name (if externalSourceGUID
+                               externalSourceName
+                               metadata-collection-name)
+             provenance      (if externalSourceGUID
+                               (.name InstanceProvenanceType/EXTERNAL_SOURCE)
+                               (.name InstanceProvenanceType/LOCAL_COHORT))
+             classfn-1       (-> (om/skeleton-classification
+                                   {:metadata-collection-id   collection-id
+                                    :metadata-collection-name collection-name
+                                    :instance-provenance-type provenance
+                                    :user-name                userId
+                                    :type-name                classificationName
+                                    :replicated-by            replicated-by})
+                               (merge (om-datafy/InstanceProperties->map type-def classificationProperties)))
+             classfn-1       (when classificationOrigin
+                               (-> classfn-1
+                                 (assoc :openmetadata.Classification/classificationOrigin (.name classificationOrigin))
+                                 (assoc :openmetadata.Classification/classificationOriginGUID classificationOriginGUID)))
+             classifications (->> (:openmetadata.Entity/classifications entity-0)
+                               (filter #(not= classificationName (:openmetadata.Classification/name %))))
+             classifications (cons classfn-1 classifications)
+             entity-1        (-> entity-0
+                               (update-in [:openmetadata.Entity/version] inc)
+                               (assoc :openmetadata.Entity/classifications classifications)
+                               (assoc :openmetadata.Entity/updatedBy userId)
+                               (assoc :openmetadata.Entity/updateTime (Date.)))]
+         (when entity-1
+           (store/persist-entity xtdb-node entity-1)
+           (om-datafy/map->EntityDetail entity-1)))))))
 
-(defn -classifyEntity [this
-                       ^String userId
-                       ^String entityGUID
-                       ^String classificationName
-                       ^String externalSourceGUID
-                       ^String externalSourceName
-                       ^ClassificationOrigin classificationOrigin
-                       ^String classificationOriginGUID
-                       ^InstanceProperties classificationProperties]
-  nil)
+(defn ^EntityDetail -declassifyEntity
+  [this
+   ^String userId
+   ^String entityGUID
+   ^String classificationName]
+  (.superDeclassifyEntityParameterValidation this userId entityGUID classificationName "declassifyEntity")
+  (let [{:keys [context
+                xtdb-node]} @(.state this)]
+    (binding [om/*context* context]
+      (let [entity-0          (is-entity-known-else-throw this entityGUID)
+            classifications-0 (:openmetadata.Entity/classifications entity-0)
+            classifications-1 (->> classifications-0
+                                (filter #(not= classificationName (:openmetadata.Classification/name %))))
+            entity-1          (-> entity-0
+                                (update-in [:openmetadata.Entity/version] inc)
+                                (assoc :openmetadata.Entity/classifications classifications-1)
+                                (assoc :openmetadata.Entity/updatedBy userId)
+                                (assoc :openmetadata.Entity/updateTime (Date.)))]
+        (when entity-1
+          (store/persist-entity xtdb-node entity-1)
+          (om-datafy/map->EntityDetail entity-1))))))
 
-(defn -declassifyEntity [this
-                         ^String userId
-                         ^String entityGUID
-                         ^String classificationName]
-  nil)
+(defn -updateEntityClassification
+  [this
+   ^String userId
+   ^String entityGUID
+   ^String classificationName
+   ^InstanceProperties properties]
+  (let [{:keys [context
+                xtdb-node]} @(.state this)]
+    (binding [om/*context* context]
+      (let [entity-0          (is-entity-known-else-throw this entityGUID)
+            type-def          (om/find-type-def-by-name classificationName)
+            classifications-0 (:openmetadata.Entity/classifications entity-0)
+            classfn-0         (->> classifications-0
+                                (filter #(= classificationName (:openmetadata.Classification/name %)))
+                                (first))
+            classfn-1         (-> classfn-0
+                                (merge (om-datafy/InstanceProperties->map type-def properties))
+                                (assoc :openmetadata.Classification/updatedBy userId)
+                                (assoc :openmetadata.Classification/updateTime (Date.))
+                                (update-in [:openmetadata.Classification/version] inc))
+            classifications-1 (->> classifications-0
+                                (filter #(not= classificationName (:openmetadata.Classification/name %)))
+                                (cons classfn-1))
+            entity-1          (-> entity-0
+                                (update-in [:openmetadata.Entity/version] inc)
+                                (assoc :openmetadata.Entity/classifications classifications-1)
+                                (assoc :openmetadata.Entity/updatedBy userId)
+                                (assoc :openmetadata.Entity/updateTime (Date.)))]
+        (when entity-1
+          (store/persist-entity xtdb-node entity-1)
+          (om-datafy/map->EntityDetail entity-1))))))
 
-(defn -updateEntityClassification [this
-                                   ^String userId
-                                   ^String entityGUID
-                                   ^String classificationName
-                                   ^InstanceProperties properties]
-  nil)
-
-(defn -addRelationship [this
-                        ^String userId
-                        ^String relationshipTypeGUID
-                        ^InstanceProperties initialProperties
-                        ^String entityOneGUID
-                        ^String entityTwoGUID
-                        ^InstanceStatus initialStatus]
-  nil)
+(defn ^Relationship -addRelationship
+  [this
+   ^String userId
+   ^String relationshipTypeGUID
+   ^InstanceProperties initialProperties
+   ^String entityOneGUID
+   ^String entityTwoGUID
+   ^InstanceStatus initialStatus]
+  (.superAddRelationshipParameterValidation this userId relationshipTypeGUID initialProperties entityOneGUID
+    entityTwoGUID initialStatus "addRelationship")
+  (let [{:keys [context]} @(.state this)]
+    (binding [om/*context* context]
+      (let [type-def            (om/find-type-def-by-guid relationshipTypeGUID)
+            instance-properties (om-datafy/InstanceProperties->map type-def initialProperties)
+            status              (.name initialStatus)
+            relationship        (add-relationship this userId type-def entityOneGUID entityTwoGUID instance-properties status)]
+        (om-datafy/map->Relationship relationship)))))
 
 (defn -addExternalRelationship [this
                                 ^String userId
@@ -599,10 +741,4 @@
                                        ^String typeDefGUID
                                        ^String typeDefName
                                        ^String homeMetadataCollectionId]
-  nil)
-
-(defn -getEntityProxy [this
-                       ^String userId
-                       ^String entityGUID
-                       ^String methodName]
   nil)

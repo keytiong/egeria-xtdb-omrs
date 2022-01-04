@@ -4,9 +4,6 @@
   :license {:name "The MIT License"
             :url  "http://opensource.org/licenses/MIT"}
   :dependencies [[org.clojure/clojure "1.10.3"]
-                 [org.odpi.egeria/repository-services-implementation "3.3"
-                  :exclusions [org.odpi.egeria/connector-configuration-factory]
-                  ]
                  [com.xtdb/xtdb-core "1.19.0"]]
   :target-path "target/%s"
   :source-paths ["src/main/clojure"]
@@ -33,5 +30,8 @@
              :reveal  {:dependencies [[vlaaad/reveal "1.3.262"]]
                        :repl-options {:nrepl-middleware [vlaaad.reveal.nrepl/middleware]
                                       :port             50505}}
+             :provided {:dependencies [[org.odpi.egeria/repository-services-implementation "3.3"
+                                        :exclusions [org.odpi.egeria/connector-configuration-factory]
+                                        ]]}
              :uberjar {:aot      :all
                        :jvm-opts ["-Dclojure.compiler.direct-linking=true"]}})
