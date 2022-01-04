@@ -708,7 +708,6 @@
 (defn- map->egeria [kfs o m]
   (reduce-kv (fn [o k f]
                (let [v (navigate m k (k m))]
-                 (tap> k)
                  (f o v)))
     o
     kfs))

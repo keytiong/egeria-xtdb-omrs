@@ -21,17 +21,17 @@
 (defn find-type-def-by-guid
   [guid]
   (if-let [type-store (:type-store *context*)]
-    (p/datafy (om-p/fetch-type-def-by-guid type-store guid))))
+    (om-p/fetch-type-def-by-guid type-store guid)))
 
 (defn find-type-def-by-name
   [type-def-name]
   (if-let [type-store (:type-store *context*)]
-    (p/datafy (om-p/fetch-type-def-by-name type-store type-def-name))))
+    (om-p/fetch-type-def-by-name type-store type-def-name)))
 
 (defn find-attribute-type-def-by-guid
   [guid]
   (let [type-store (:type-store *context*)]
-    (p/datafy (om-p/fetch-attribute-type-def-by-guid type-store guid))))
+    (om-p/fetch-attribute-type-def-by-guid type-store guid)))
 
 (defn find-type-def-ancestors
   [type-def]
@@ -46,17 +46,17 @@
 (defn list-type-defs
   []
   (if-let [type-store (:type-store *context*)]
-    (p/datafy (om-p/list-type-defs type-store))))
+    (om-p/list-type-defs type-store)))
 
 (defn list-attribute-type-defs
   []
   (if-let [type-store (:type-store *context*)]
-    (p/datafy (om-p/list-attribute-type-defs type-store))))
+    (om-p/list-attribute-type-defs type-store)))
 
 (defn find-entity-by-guid [guid]
   [guid]
   (if-let [instance-store (:instance-store *context*)]
-    (p/datafy (om-p/fetch-entity-by-guid instance-store guid))))
+    (om-p/fetch-entity-by-guid instance-store guid)))
 
 (defn- qualify-attribute-name-with-type [type-def attr-def]
   (let [ns   (str "openmetadata." (:openmetadata.TypeDef/name type-def))

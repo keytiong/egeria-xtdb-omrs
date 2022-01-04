@@ -1,7 +1,6 @@
 (ns io.kosong.egeria.omrs.protocols
   (:require [clojure.core.protocols :as p])
-  (:import (org.odpi.openmetadata.repositoryservices.rest.properties InstanceHistoricalFindRequest)
-           (org.odpi.openmetadata.repositoryservices.localrepository.repositorycontentmanager OMRSRepositoryContentHelper)
+  (:import (org.odpi.openmetadata.repositoryservices.localrepository.repositorycontentmanager OMRSRepositoryContentHelper)
            (org.odpi.openmetadata.repositoryservices.connectors.stores.metadatacollectionstore OMRSMetadataCollection)))
 
 (defprotocol TypeStore
@@ -22,11 +21,11 @@
   (list-attribute-type-defs [this]
     (map p/datafy (.getKnownAttributeTypeDefs this)))
   (fetch-type-def-by-guid [this guid]
-    (.getTypeDef this "TypeStore" "guid" guid "fetch-type-def-by-guid"))
+    (p/datafy (.getTypeDef this "TypeStore" "guid" guid "fetch-type-def-by-guid")))
   (fetch-type-def-by-name [this name]
-    (.getTypeDefByName this "TypeStore" name))
+    (p/datafy (.getTypeDefByName this "TypeStore" name)))
   (fetch-attribute-type-def-by-guid [this guid]
-    (.getAttributeTypeDef this "TypeStore" guid "fetch-attribute-type-def-by-guid")))
+    (p/datafy (.getAttributeTypeDef this "TypeStore" guid "fetch-attribute-type-def-by-guid"))))
 
 (extend-type OMRSMetadataCollection
   InstanceStore
