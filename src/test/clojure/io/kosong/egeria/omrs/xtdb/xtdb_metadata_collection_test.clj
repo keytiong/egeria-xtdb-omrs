@@ -6,9 +6,14 @@
             [dev]
             [xtdb.api :as xt]
             [clojure.datafy :refer [datafy]]
-            [io.kosong.egeria.omrs.xtdb.metadata-store :as store])
+            [io.kosong.egeria.omrs.xtdb.metadata-store :as store]
+            [io.kosong.egeria.omrs.xtdb.xtdb-metadata-collection :as mc])
   (:import (java.util UUID Date)
-           (org.odpi.openmetadata.repositoryservices.connectors.stores.metadatacollectionstore.properties.instances InstanceStatus EntityDetail PrimitivePropertyValue Classification)))
+           (org.odpi.openmetadata.repositoryservices.connectors.stores.metadatacollectionstore.properties.instances InstanceStatus EntityDetail)
+           (org.odpi.openmetadata.repositoryservices.connectors.stores.metadatacollectionstore.properties.search PropertyComparisonOperator)
+           (org.odpi.openmetadata.repositoryservices.connectors.stores.metadatacollectionstore.properties.search SearchProperties PropertyCondition PropertyComparisonOperator)
+           (org.odpi.openmetadata.repositoryservices.connectors.stores.metadatacollectionstore.properties MatchCriteria)
+           ))
 
 (def system
   (ig/init dev/dev-config))
@@ -59,9 +64,9 @@
     glossary-type-guid
     (InstanceProperties-for glossary-type
       {:openmetadata.Referenceable/qualifiedName "OMRS:Glossary-001"
-       :openmetadata.Glossary/displayName "Glossary 001"
-       :openmetadata.Glossary/description "Glossary 001 description"})
-    [] ;; Classification list
+       :openmetadata.Glossary/displayName        "Glossary 001"
+       :openmetadata.Glossary/description        "Glossary 001 description"})
+    []                                                      ;; Classification list
     InstanceStatus/ACTIVE))
 
 (def glossary-001-guid (.getGUID glossary-001-v1))
@@ -99,9 +104,9 @@
     glossary-term-type-guid
     (InstanceProperties-for glossary-type
       {:openmetadata.Referenceable/qualifiedName "GlossaryTerm-001"
-       :openmetadata.GlossaryTerm/displayName "Glossary Term 001"
-       :openmetadata.GlossaryTerm/description "Glossary Term 001 description"})
-    [] ;; Classification list
+       :openmetadata.GlossaryTerm/displayName    "Glossary Term 001"
+       :openmetadata.GlossaryTerm/description    "Glossary Term 001 description"})
+    []                                                      ;; Classification list
     InstanceStatus/DRAFT))
 
 (def glossary-term-001-guid (.getGUID glossary-term-001-v1))
@@ -112,8 +117,8 @@
     glossary-term-001-guid
     (InstanceProperties-for glossary-term-type
       {:openmetadata.Referenceable/qualifiedName "GlossaryTerm-001"
-       :openmetadata.GlossaryTerm/displayName "Glossary Term 001"
-       :openmetadata.GlossaryTerm/description "Glossary Term 001 description v2"})))
+       :openmetadata.GlossaryTerm/displayName    "Glossary Term 001"
+       :openmetadata.GlossaryTerm/description    "Glossary Term 001 description v2"})))
 
 (facts "updateEntityProperties()"
 
@@ -253,6 +258,64 @@
     (-> relationship-001 .getEntityTwoProxy .getType .getTypeDefGUID) => glossary-term-type-guid))
 
 
+
+(comment
+
+  (def xtdb-node (dev/xtdb-node system))
+
+
+  (def search-properties
+    (doto (SearchProperties.)
+      (.setMatchCriteria MatchCriteria/ANY)
+      (.setConditions [(doto (PropertyCondition.)
+                         (.setOperator PropertyComparisonOperator/EQ)
+                         (.setProperty "qualifiedName")
+                         (.setValue (om-datafy/->InstancePropertyValue
+                                      (om/find-attribute-type-def-by-name "string")
+                                      "GlossaryTerm-001")))])))
+
+  (mc/xtdb-query
+    glossary-term-type-guid
+    nil
+    search-properties
+    nil
+    )
+
+  (mc/find-entities xtdb-node
+    "c04e29b2-2d66-48fc-a20d-e59895de6040"
+    #_glossary-term-type-guid
+    #_(:openmetadata.TypeDef/guid (om/find-type-def-by-name "GlossaryTerm"))
+    nil
+    search-properties
+    nil
+    (Date.))
+
+  (xt/q (xt/db xtdb-node)
+    '{:find [e v status]
+      :where
+            [
+             [e :openmetadata.Referenceable/qualifiedName v]
+             [e :openmetadata.Entity/status status]
+             [e :openmetadata.Entity/type #{"c04e29b2-2d66-48fc-a20d-e59895de6040"}]
+             ]})
+
+  (om/find-type-def-ancestors (om/find-type-def-by-name "Glossary"))
+
+  (->> (om/find-type-def-by-property-name "qualifiedName")
+    (filter (fn [x] (= "ENTITY_DEF" (:openmetadata.TypeDef/category x))))
+    (map om/type-def-attribute-key->attribute)
+    (mapcat keys))
+
+  (->> (om/find-type-def-by-name "GlossaryTerm")
+    (om/find-type-def-descendants)
+    (map :openmetadata.TypeDef/name))
+
+  (->> (om/find-type-def-by-name "OpenMetadataRoot")
+    om/find-type-def-descendants
+    (map om/type-def-attribute-key->attribute)
+    (mapcat keys)
+    set
+    (filter #(= "name" (name %)))),)
 
 ;;
 ;; clean up

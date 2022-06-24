@@ -9,7 +9,7 @@
            (org.odpi.openmetadata.repositoryservices.connectors.stores.metadatacollectionstore.properties.instances EntityDetail InstanceProperties EntitySummary InstanceStatus EntityProxy ClassificationOrigin Classification Relationship InstanceProvenanceType InstanceAuditHeader)
            (java.util Date Collections List)
            (org.odpi.openmetadata.repositoryservices.connectors.stores.metadatacollectionstore.properties HistorySequencingOrder SequencingOrder MatchCriteria)
-           (org.odpi.openmetadata.repositoryservices.connectors.stores.metadatacollectionstore.properties.search SearchProperties SearchClassifications)
+           (org.odpi.openmetadata.repositoryservices.connectors.stores.metadatacollectionstore.properties.search SearchProperties SearchClassifications PropertyComparisonOperator)
            (org.odpi.openmetadata.frameworks.auditlog AuditLog)
            (org.odpi.openmetadata.repositoryservices.ffdc.exception EntityNotKnownException)
            (org.odpi.openmetadata.repositoryservices.ffdc OMRSErrorCode)))
@@ -79,7 +79,7 @@
    ^String metadataCollectionId
    ^AuditLog auditLog]
   (.superSetAuditLog this auditLog)
-  (let [context (om/->context {:type-store repositoryHelper
+  (let [context (om/->context {:type-store     repositoryHelper
                                :instance-store this})]
     (swap! (.state this) assoc :context context)))
 
@@ -129,16 +129,16 @@
   ([this guid]
    (is-entity-known-else-throw this guid (Date.)))
   ([this guid valid-time]
-  (let [{:keys [repository-name
-                xtdb-node]} @(.state this)
-        entity (store/fetch-entity-by-guid xtdb-node guid valid-time)]
-    (if entity
-      entity
-      (let [msg-params (into-array String [guid "is-entity-known" repository-name])
-            msg        (.getMessageDefinition OMRSErrorCode/ENTITY_NOT_KNOWN msg-params)]
-        (throw (EntityNotKnownException. msg
-                 (str 'io.kosong.egeria.omrs.xtdb.xtdb-metadata-collection)
-                 "")))))))
+   (let [{:keys [repository-name
+                 xtdb-node]} @(.state this)
+         entity (store/fetch-entity-by-guid xtdb-node guid valid-time)]
+     (if entity
+       entity
+       (let [msg-params (into-array String [guid "is-entity-known" repository-name])
+             msg        (.getMessageDefinition OMRSErrorCode/ENTITY_NOT_KNOWN msg-params)]
+         (throw (EntityNotKnownException. msg
+                  (str 'io.kosong.egeria.omrs.xtdb.xtdb-metadata-collection)
+                  "")))))))
 
 (defn ^EntityDetail -isEntityKnown
   [this userId guid]
@@ -202,6 +202,102 @@
                                pageSize]
   (Collections/EMPTY_LIST))
 
+(defn entity-detail [m e]
+  (-> m
+    (conj [e :openmetadata.Entity/guid])
+    (conj '(not [e :openmetadata.Entity/isProxy true]))))
+
+(defn entity-subtypes [m e entity-type-guid entity-subtype-guids]
+  (if entity-type-guid
+    (let [ds (->> (om/find-type-def-descendants {:openmetadata.TypeDef/guid entity-type-guid})
+               (map :openmetadata.TypeDef/guid)
+               (cons entity-type-guid)
+               (apply hash-set))]
+      (conj m [e :openmetadata.Entity/type ds])
+      m)))
+
+(defn entity-statuses [m e statuses]
+  (let [xs (map (fn [s] (.name s)) statuses)]
+    (if (empty? xs)
+      (conj m '(not [e :openmetadata.Entity/status "DELETED"]))
+      (conj m [e :openmetadata.Entity/status (apply hash-set xs)]))))
+
+(defmulti entity-property-condition (fn [condition]
+                                      (.getOperator condition)))
+
+(defmethod entity-property-condition PropertyComparisonOperator/EQ [condition]
+  (let [e         (symbol "e")
+        prop-name (.getProperty condition)
+        val       (some-> condition .getValue .valueAsObject)
+        ks        (->> (om/find-type-def-by-property-name prop-name)
+                    (filter (fn [x] (= "ENTITY_DEF" (:openmetadata.TypeDef/category x))))
+                    (map om/type-def-attribute-key->attribute)
+                    (mapcat keys)
+                    (filter (fn [x] (= prop-name (name x)))))
+        xs        (reduce (fn [a k] (conj a [e k val])) [] ks)]
+    (cons 'or (apply list xs))))
+
+(defmethod entity-property-condition PropertyComparisonOperator/NEQ [condition]
+  (let [e         (symbol "e")
+        prop-name (.getProperty condition)
+        val       (some-> condition .getValue .valueAsObject)
+        ks        (->> (om/find-type-def-by-property-name prop-name)
+                    (filter (fn [x] (= "ENTITY_DEF" (:openmetadata.TypeDef/category x))))
+                    (map om/type-def-attribute-key->attribute)
+                    (mapcat keys)
+                    (filter (fn [x] (= prop-name (name x)))))
+        xs        (reduce (fn [a k] (conj a [e k val])) [] ks)]
+    `(~(symbol "not") (~(symbol "or") ~@(apply list xs)))))
+
+
+(defn entity-property-conditions [m e search-properties]
+  (let [match-criteria (.getMatchCriteria search-properties)]
+    (cond
+      (= MatchCriteria/ALL match-criteria)
+      (let [conditions (.getConditions search-properties)
+            clauses    (map entity-property-condition conditions)]
+        (reduce conj m clauses))
+
+      (= MatchCriteria/ANY match-criteria)
+      (let [conditions  (.getConditions search-properties)
+            clauses     (map entity-property-condition conditions)
+            join-clause (->> (apply list clauses)
+                          (cons ['e])
+                          (cons 'or-join))]
+        (conj m join-clause))
+
+      (= MatchCriteria/NONE match-criteria)
+      (let [conditions  (.getConditions search-properties)
+            clauses     (map entity-property-condition conditions)
+            join-clause (->> (apply list clauses)
+                          (cons ['e])
+                          (cons 'not-join))]
+        (conj m join-clause)))))
+
+(defn xtdb-query [entity-type--guid entity-subtype-guids search-properties statuses]
+  (let [e       (symbol "e")
+        clauses (-> []
+                  (entity-detail e)
+                  (entity-subtypes e entity-type--guid entity-subtype-guids)
+                  (entity-statuses e statuses)
+                  (entity-property-conditions e search-properties))]
+    {:find  [e]
+     :where clauses}))
+
+(defn find-entities
+  [xtdb-node
+   entity-type--guid
+   entity-subtype-guids
+   search-properties
+   statuses
+   valid-time]
+  (let [db (xt/db xtdb-node valid-time)
+        q  (xtdb-query entity-type--guid entity-subtype-guids search-properties statuses)
+        rs (->> (xt/q db q)
+             (map first))]
+    (when-not (empty? rs)
+      (map (fn [guid] (store/fetch-entity-by-guid xtdb-node guid)) rs))))
+
 (defn -findEntities [this
                      ^String userId
                      ^String entityTypeGUID
@@ -214,7 +310,15 @@
                      ^String sequencingProperty
                      ^SequencingOrder sequencingOrder
                      pageSize]
-  (Collections/EMPTY_LIST))
+  (let [{:keys [xtdb-node
+                context]} @(.state this)]
+    (binding [om/*context* context]
+      (find-entities xtdb-node
+        entityTypeGUID
+        entitySubtypeGUIDs
+        matchProperties
+        limitResultsByStatus
+        asOfTime))))
 
 (defn -findEntitiesByClassification [this
                                      ^String userId

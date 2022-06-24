@@ -53,15 +53,39 @@
   (if-let [type-store (:type-store *context*)]
     (om-p/list-attribute-type-defs type-store)))
 
+(defn find-type-def-descendants
+  [type-def]
+  (let [type-def-guid (:openmetadata.TypeDef/guid type-def)
+        descendants?  (fn [t]
+                        (let [ids (->> (find-type-def-ancestors t)
+                                    (map :openmetadata.TypeDef/guid)
+                                    set)]
+                          (ids type-def-guid)))]
+    (->> (list-type-defs)
+      (filter descendants?))))
+
+(defn find-type-def-by-property-name
+  [property-name]
+  (let [f (fn [t]
+            (->> (:openmetadata.TypeDef/propertiesDefinition t)
+              (filter #(= (:openmetadata.TypeDefAttribute/attributeName %) property-name))
+              (not-empty)))]
+    (->> (list-type-defs)
+      (filter f))))
+
 (defn find-entity-by-guid [guid]
   [guid]
   (if-let [instance-store (:instance-store *context*)]
     (om-p/fetch-entity-by-guid instance-store guid)))
 
+(defn namespace-for-type-def [type-def]
+  (if-let [type-name (:openmetadata.TypeDef/name type-def)]
+    (str "openmetadata." type-name)))
+
 (defn- qualify-attribute-name-with-type [type-def attr-def]
-  (let [ns   (str "openmetadata." (:openmetadata.TypeDef/name type-def))
-        name (:openmetadata.TypeDefAttribute/attributeName attr-def)]
-    (keyword ns name)))
+  (let [type-def-ns   (namespace-for-type-def type-def)
+        attr-name (:openmetadata.TypeDefAttribute/attributeName attr-def)]
+    (keyword type-def-ns attr-name)))
 
 (defn- deduplicate-overridden-attribute-names [type-def-attribute-pairs]
   (->> type-def-attribute-pairs
@@ -91,6 +115,16 @@
 (defn attribute-keys [type-def]
   (->> (type-def-attribute-key->attribute type-def)
     (keys)))
+
+(defn list-attribute-keys []
+  (->> (list-type-defs)
+    (mapcat attribute-keys)
+    set))
+
+(defn find-attribute-type-def-by-name [name]
+  (->> (list-attribute-type-defs)
+    (filter #(= (:openmetadata.AttributeTypeDef/name %) name))
+    first))
 
 (defn skeleton-entity
   [{:keys [guid metadata-collection-id metadata-collection-name instance-provenance-type

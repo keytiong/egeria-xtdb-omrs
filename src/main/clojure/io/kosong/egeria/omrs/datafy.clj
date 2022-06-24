@@ -911,7 +911,6 @@
     (map->egeria map->instance-type (InstanceType.) m)))
 
 (defn map->Relationship [m]
-  (tap> "before")
   (map->egeria map->relationship (Relationship.) m)
   (let [^Relationship o (map->egeria map->relationship (Relationship.) m)
         type-def        (omrs/find-type-def-by-guid (:openmetadata.Relationship/type m))
